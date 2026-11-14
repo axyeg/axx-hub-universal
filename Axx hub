@@ -1,0 +1,1422 @@
+local SoundService = game:GetService("SoundService")
+
+local music = Instance.new("Sound")
+music.Name = "AxxIntroMusic"
+music.SoundId = "rbxassetid://92950955480719"
+music.Volume = 0.7
+music.Looped = false
+music.Parent = SoundService
+music:Play()
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local introGui
+
+local function runIntro()
+    local Players = game:GetService("Players")
+    local TweenService = game:GetService("TweenService")
+    local RunService = game:GetService("RunService")
+    local lp = Players.LocalPlayer
+
+    local okHui, hui = pcall(function() return gethui and gethui() end)
+    local parent = (okHui and hui) or lp:WaitForChild("PlayerGui")
+
+    local C = {
+        Void  = Color3.fromHex("#000000"),
+        Deep  = Color3.fromHex("#04060b"),
+        Navy  = Color3.fromHex("#0a1020"),
+        Blue  = Color3.fromHex("#7aa7f5"),
+        Light = Color3.fromHex("#9fc3ff"),
+        Ice   = Color3.fromHex("#c4daff"),
+        Frost = Color3.fromHex("#e8f0ff"),
+        White = Color3.new(1, 1, 1),
+    }
+    local SFX = { BOOM = "9118823100", WHOOSH = "9114663715", CLICK = "9125401346", RISE = "9045889306" }
+    local STAGE_W, STAGE_H = 1100, 700
+    local CX, CY = 550, 350
+    local TITLE_Y = 322
+    local rng = Random.new()
+
+    local function new(class, props, parentObj)
+        local obj = Instance.new(class)
+        if props then
+            for key, value in pairs(props) do
+                obj[key] = value
+            end
+        end
+        obj.Parent = parentObj
+        return obj
+    end
+
+    local function frame(props, parentObj)
+        local p = { BorderSizePixel = 0, BackgroundColor3 = C.White }
+        for key, value in pairs(props or {}) do
+            p[key] = value
+        end
+        return new("Frame", p, parentObj)
+    end
+
+    local function round(obj)
+        return new("UICorner", { CornerRadius = UDim.new(1, 0) }, obj)
+    end
+
+    local function colors(list)
+        local kp = {}
+        for i, item in ipairs(list) do
+            kp[i] = ColorSequenceKeypoint.new(item[1], item[2])
+        end
+        return ColorSequence.new(kp)
+    end
+
+    local function alphas(list)
+        local kp = {}
+        for i, item in ipairs(list) do
+            kp[i] = NumberSequenceKeypoint.new(item[1], item[2])
+        end
+        return NumberSequence.new(kp)
+    end
+
+    local function grad(obj, colorList, alphaList, rotation)
+        local g = Instance.new("UIGradient")
+        if colorList then g.Color = colors(colorList) end
+        if alphaList then g.Transparency = alphas(alphaList) end
+        g.Rotation = rotation or 0
+        g.Parent = obj
+        return g
+    end
+
+    local function tw(obj, time, props, style, dir)
+        local tween = TweenService:Create(
+            obj,
+            TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
+            props
+        )
+        tween:Play()
+        return tween
+    end
+
+    local function snd(id, vol, pitch)
+        pcall(function()
+            local s = Instance.new("Sound")
+            s.SoundId = "rbxassetid://" .. id
+            s.Volume = vol or 0.6
+            s.PlaybackSpeed = pitch or 1
+            s.Parent = SoundService
+            s:Play()
+            task.delay(6, function() s:Destroy() end)
+        end)
+    end
+
+    local function at(time, fn)
+        task.delay(time, function()
+            local ok, err = pcall(fn)
+            if not ok then warn("[AxxHub] intro:", err) end
+        end)
+    end
+
+    local gui = new("ScreenGui", {
+        Name = "AxxHub_Intro",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        DisplayOrder = 10000,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    }, parent)
+    pcall(function() gui.ScreenInsets = Enum.ScreenInsets.None end)
+    introGui = gui
+
+    local bg = frame({
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromScale(1.05, 1.05),
+        ZIndex = 0,
+        Active = true,
+    }, gui)
+    grad(bg, {
+        { 0, Color3.fromHex("#05070d") },
+        { 0.55, C.Void },
+        { 1, Color3.fromHex("#070d1a") },
+    }, nil, 90)
+
+    local content = new("CanvasGroup", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        GroupTransparency = 1,
+        ZIndex = 1,
+    }, gui)
+
+    local function layer(z)
+        return frame({
+            Size = UDim2.fromScale(1, 1),
+            BackgroundTransparency = 1,
+            ZIndex = z,
+        }, content)
+    end
+
+    local mistLayer = layer(2)
+    local mists = {}
+    for i = 1, 3 do
+        local m = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Size = UDim2.fromScale(1.8, 0.22 + i * 0.05),
+            Position = UDim2.fromScale(0.5, 0.15 + i * 0.28),
+            BackgroundColor3 = C.Light,
+        }, mistLayer)
+        grad(m, nil, { { 0, 1 }, { 0.5, 0.955 }, { 1, 1 } }, 0)
+        mists[i] = {
+            obj = m,
+            y = 0.15 + i * 0.28,
+            speed = rng:NextNumber(0.12, 0.28),
+            phase = rng:NextNumber(0, 6.28),
+            range = rng:NextNumber(0.03, 0.07),
+        }
+    end
+
+    local starLayer = layer(3)
+    local stars = {}
+    for i = 1, 80 do
+        local size = rng:NextInteger(1, 3)
+        local s = frame({
+            Size = UDim2.fromOffset(size, size),
+            Position = UDim2.fromScale(rng:NextNumber(), rng:NextNumber()),
+            BackgroundColor3 = (i % 4 == 0) and C.Ice or C.White,
+            BackgroundTransparency = 1,
+        }, starLayer)
+        round(s)
+        stars[i] = {
+            obj = s,
+            speed = rng:NextNumber(0.8, 2.6),
+            phase = rng:NextNumber(0, 6.28),
+            peak = rng:NextNumber(0.35, 0.9),
+        }
+    end
+
+    local dust = {}
+    for i = 1, 16 do
+        local d = frame({
+            Size = UDim2.fromOffset(3, 3),
+            BackgroundColor3 = C.Ice,
+            BackgroundTransparency = 1,
+        }, starLayer)
+        round(d)
+        dust[i] = {
+            obj = d,
+            x = rng:NextNumber(),
+            y = rng:NextNumber(),
+            speed = rng:NextNumber(0.01, 0.03),
+            sway = rng:NextNumber(0.01, 0.03),
+            phase = rng:NextNumber(0, 6.28),
+        }
+    end
+
+    local vignette = layer(8)
+    local function edge(anchor, pos, size, rotation)
+        local e = frame({
+            AnchorPoint = anchor,
+            Position = pos,
+            Size = size,
+            BackgroundColor3 = C.Void,
+        }, vignette)
+        grad(e, nil, { { 0, 0.1 }, { 1, 1 } }, rotation)
+    end
+    edge(Vector2.new(0, 0), UDim2.fromScale(0, 0), UDim2.fromScale(1, 0.35), 90)
+    edge(Vector2.new(0, 1), UDim2.fromScale(0, 1), UDim2.fromScale(1, 0.35), -90)
+    edge(Vector2.new(0, 0), UDim2.fromScale(0, 0), UDim2.fromScale(0.3, 1), 0)
+    edge(Vector2.new(1, 0), UDim2.fromScale(1, 0), UDim2.fromScale(0.3, 1), 180)
+
+    local flashLayer = frame({
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = C.Frost,
+        BackgroundTransparency = 1,
+        ZIndex = 9,
+    }, content)
+
+    local stage = frame({
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(STAGE_W, STAGE_H),
+        BackgroundTransparency = 1,
+        ZIndex = 5,
+    }, content)
+    local stageScale = new("UIScale", { Scale = 1 }, stage)
+
+    local function fit()
+        local size = gui.AbsoluteSize
+        if size.X < 10 or size.Y < 10 then return end
+        stageScale.Scale = math.clamp(math.min(size.X / (STAGE_W - 100), size.Y / (STAGE_H - 20)), 0.4, 1.6)
+    end
+    fit()
+    gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+
+    local core = frame({
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromOffset(CX, CY),
+        Size = UDim2.fromOffset(1, 1),
+        BackgroundTransparency = 1,
+    }, stage)
+    local coreEntry = new("UIScale", { Scale = 0 }, core)
+    local coreInner = frame({
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(1, 1),
+        BackgroundTransparency = 1,
+    }, core)
+    local corePulse = new("UIScale", { Scale = 1 }, coreInner)
+    for i = 1, 7 do
+        local d = 120 + i * 62
+        local c = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromOffset(d, d),
+            BackgroundColor3 = (i > 4) and C.Navy or C.Blue,
+            BackgroundTransparency = 0.96,
+        }, coreInner)
+        round(c)
+    end
+
+    local dial = frame({
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromOffset(CX, CY),
+        Size = UDim2.fromOffset(660, 660),
+        BackgroundTransparency = 1,
+    }, stage)
+    for i = 0, 71 do
+        local deg = i * 5
+        local rad = math.rad(deg)
+        local major = (i % 6 == 0)
+        local len = major and 18 or 8
+        local radius = 330 - len / 2
+        local tick = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Size = UDim2.fromOffset(major and 3 or 2, len),
+            Position = UDim2.fromOffset(330 + math.cos(rad) * radius, 330 + math.sin(rad) * radius),
+            Rotation = deg + 90,
+            BackgroundColor3 = major and C.Frost or C.Ice,
+            BackgroundTransparency = 1,
+        }, dial)
+        at(0.25 + i * 0.01, function()
+            tw(tick, 0.4, { BackgroundTransparency = major and 0.15 or 0.6 })
+        end)
+    end
+
+    local function makeRing(diameter, thickness, color, startAlpha)
+        local f = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromOffset(CX, CY),
+            Size = UDim2.fromOffset(diameter, diameter),
+            BackgroundTransparency = 1,
+        }, stage)
+        round(f)
+        local s = new("UIStroke", { Thickness = thickness, Color = color, Transparency = startAlpha }, f)
+        local sc = new("UIScale", { Scale = 0.75 }, f)
+        return s, sc
+    end
+
+    local ringBaseStroke, ringBaseScale = makeRing(620, 1, C.Ice, 1)
+    local ringArcAStroke, ringArcAScale = makeRing(620, 3, C.White, 1)
+    local gradA = grad(ringArcAStroke, nil, {
+        { 0, 1 }, { 0.3, 1 }, { 0.5, 0 }, { 0.7, 1 }, { 1, 1 },
+    }, 0)
+    local ringInStroke, ringInScale = makeRing(572, 1, C.Light, 1)
+    local ringArcBStroke, ringArcBScale = makeRing(572, 2, C.Light, 1)
+    local gradB = grad(ringArcBStroke, nil, {
+        { 0, 1 }, { 0.38, 1 }, { 0.5, 0.05 }, { 0.62, 1 }, { 1, 1 },
+    }, 0)
+
+    local function sparkle(size, x, y)
+        local holder = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromOffset(x, y),
+            Size = UDim2.fromOffset(size, size),
+            BackgroundTransparency = 1,
+        }, stage)
+        local scale = new("UIScale", { Scale = 0 }, holder)
+        local vertical = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.new(0, 2, 1, 0),
+            BackgroundColor3 = C.Frost,
+        }, holder)
+        grad(vertical, nil, { { 0, 1 }, { 0.5, 0 }, { 1, 1 } }, 90)
+        local horizontal = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.new(1, 0, 0, 2),
+            BackgroundColor3 = C.Frost,
+        }, holder)
+        grad(horizontal, nil, { { 0, 1 }, { 0.5, 0 }, { 1, 1 } }, 0)
+        for _, rot in ipairs({ 45, -45 }) do
+            local d = frame({
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.new(0.5, 0, 0, 1),
+                Rotation = rot,
+                BackgroundColor3 = C.Ice,
+            }, holder)
+            grad(d, nil, { { 0, 1 }, { 0.5, 0.2 }, { 1, 1 } }, 0)
+        end
+        frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromOffset(math.max(4, size * 0.14), math.max(4, size * 0.14)),
+            Rotation = 45,
+            BackgroundColor3 = C.White,
+        }, holder)
+        return { holder = holder, scale = scale, phase = rng:NextNumber(0, 6.28), ready = false }
+    end
+
+    local sparkles = {
+        sparkle(74, CX, CY - 312),
+        sparkle(74, CX, CY + 312),
+        sparkle(44, CX - 312, CY),
+        sparkle(44, CX + 312, CY),
+    }
+
+    local function makeLine(y, width)
+        local line = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromOffset(CX, y),
+            Size = UDim2.fromOffset(0, 1),
+            BackgroundColor3 = C.Ice,
+            BackgroundTransparency = 0.25,
+        }, stage)
+        grad(line, nil, { { 0, 1 }, { 0.5, 0 }, { 1, 1 } }, 0)
+        return function(time)
+            tw(line, time or 1, { Size = UDim2.fromOffset(width, 1) }, Enum.EasingStyle.Quint)
+        end
+    end
+
+    local lineTop = makeLine(250, 400)
+    local lineBottom = makeLine(466, 460)
+    local sparkTop = sparkle(34, CX, 250)
+    local sparkBottom = sparkle(30, CX, 466)
+    sparkles[#sparkles + 1] = sparkTop
+    sparkles[#sparkles + 1] = sparkBottom
+
+    local titleHolder = frame({
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromOffset(CX, TITLE_Y),
+        Size = UDim2.fromOffset(560, 110),
+        BackgroundTransparency = 1,
+    }, stage)
+    new("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 12),
+    }, titleHolder)
+
+    local LH, T = 88, 9
+
+    local function segments(kind, w, h, t)
+        if kind == "A" then
+            return {
+                { t * 0.4, h, w / 2, t * 0.2 },
+                { w - t * 0.4, h, w / 2, t * 0.2 },
+                { w * 0.26, h * 0.68, w * 0.74, h * 0.68 },
+            }
+        elseif kind == "X" then
+            return {
+                { t * 0.3, 0, w - t * 0.3, h },
+                { w - t * 0.3, 0, t * 0.3, h },
+            }
+        elseif kind == "H" then
+            return {
+                { t / 2, 0, t / 2, h },
+                { w - t / 2, 0, w - t / 2, h },
+                { t / 2, h / 2, w - t / 2, h / 2 },
+            }
+        elseif kind == "U" then
+            return {
+                { t / 2, 0, t / 2, h - t * 1.7 },
+                { w - t / 2, 0, w - t / 2, h - t * 1.7 },
+                { t / 2, h - t * 1.7, t * 1.6, h - t / 2 },
+                { w - t / 2, h - t * 1.7, w - t * 1.6, h - t / 2 },
+                { t * 1.6, h - t / 2, w - t * 1.6, h - t / 2 },
+            }
+        elseif kind == "B" then
+            return {
+                { t / 2, 0, t / 2, h },
+                { 0, t / 2, w * 0.64, t / 2 },
+                { w * 0.64, t / 2, w * 0.86, h * 0.18 },
+                { w * 0.86, h * 0.18, w * 0.86, h * 0.34 },
+                { w * 0.86, h * 0.34, w * 0.68, h / 2 },
+                { 0, h / 2, w * 0.68, h / 2 },
+                { w * 0.68, h / 2, w * 0.94, h * 0.66 },
+                { w * 0.94, h * 0.66, w * 0.94, h * 0.84 },
+                { w * 0.94, h * 0.84, w * 0.72, h - t / 2 },
+                { 0, h - t / 2, w * 0.72, h - t / 2 },
+            }
+        end
+        return {}
+    end
+
+    local function bar(parentObj, seg, thick, color, z)
+        local x1, y1, x2, y2 = seg[1], seg[2], seg[3], seg[4]
+        local dx, dy = x2 - x1, y2 - y1
+        local len = math.sqrt(dx * dx + dy * dy) + thick * 0.45
+        return frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromOffset((x1 + x2) / 2, (y1 + y2) / 2),
+            Size = UDim2.fromOffset(len, thick),
+            Rotation = math.deg(math.atan2(dy, dx)),
+            BackgroundColor3 = color,
+            BackgroundTransparency = 1,
+            ZIndex = z,
+        }, parentObj)
+    end
+
+    local defs = {
+        { k = "A", w = 72 }, { k = "X", w = 66 }, { k = "X", w = 66 }, { k = "_", w = 26 },
+        { k = "H", w = 62 }, { k = "U", w = 62 }, { k = "B", w = 62 },
+    }
+
+    local letters = {}
+    for i, def in ipairs(defs) do
+        local holder = frame({
+            Size = UDim2.fromOffset(def.w, LH),
+            BackgroundTransparency = 1,
+            LayoutOrder = i,
+        }, titleHolder)
+        if def.k ~= "_" then
+            local scale = new("UIScale", { Scale = 1.3 }, holder)
+            local body = frame({
+                Size = UDim2.fromScale(1, 1),
+                Position = UDim2.new(0, 0, 0, 40),
+                BackgroundTransparency = 1,
+            }, holder)
+            local segs = segments(def.k, def.w, LH, T)
+            local glows, bars, strokes = {}, {}, {}
+            for _, seg in ipairs(segs) do
+                glows[#glows + 1] = bar(body, seg, T + 10, C.Light, 1)
+            end
+            for _, seg in ipairs(segs) do
+                local b = bar(body, seg, T, C.White, 2)
+                local st = new("UIStroke", { Thickness = 1, Color = C.Light, Transparency = 1 }, b)
+                bars[#bars + 1] = b
+                strokes[#strokes + 1] = st
+            end
+            letters[#letters + 1] = {
+                body = body, scale = scale,
+                glows = glows, bars = bars, strokes = strokes,
+                index = #letters + 1,
+            }
+        end
+    end
+
+    local function revealLetter(l)
+        for _, b in ipairs(l.bars) do
+            tw(b, 0.5, { BackgroundTransparency = 0 })
+        end
+        for _, s in ipairs(l.strokes) do
+            tw(s, 0.5, { Transparency = 0.45 })
+        end
+        for _, g in ipairs(l.glows) do
+            tw(g, 0.8, { BackgroundTransparency = 0.86 })
+        end
+        tw(l.body, 0.7, { Position = UDim2.new(0, 0, 0, 0) }, Enum.EasingStyle.Back)
+        tw(l.scale, 0.7, { Scale = 1 }, Enum.EasingStyle.Back)
+    end
+
+    local function sweepShine()
+        for _, l in ipairs(letters) do
+            task.delay((l.index - 1) * 0.07, function()
+                for _, b in ipairs(l.bars) do
+                    tw(b, 0.2, { BackgroundColor3 = C.Light })
+                    task.delay(0.2, function()
+                        tw(b, 0.5, { BackgroundColor3 = C.White })
+                    end)
+                end
+            end)
+        end
+    end
+
+    local subRow = frame({
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromOffset(CX, 410),
+        Size = UDim2.fromOffset(0, 24),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1,
+    }, stage)
+    new("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 12),
+    }, subRow)
+
+    local subItems = {}
+
+    local function subLine(order, flip)
+        local line = frame({
+            Size = UDim2.fromOffset(58, 1),
+            BackgroundColor3 = C.Ice,
+            BackgroundTransparency = 1,
+            LayoutOrder = order,
+        }, subRow)
+        if flip then
+            grad(line, nil, { { 0, 0 }, { 1, 1 } }, 0)
+        else
+            grad(line, nil, { { 0, 1 }, { 1, 0 } }, 0)
+        end
+        subItems[#subItems + 1] = { obj = line, prop = "BackgroundTransparency", target = 0.2 }
+    end
+
+    local function subDiamond(order, size, color)
+        local holder = frame({
+            Size = UDim2.fromOffset(size + 4, size + 4),
+            BackgroundTransparency = 1,
+            LayoutOrder = order,
+        }, subRow)
+        local d = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromOffset(size, size),
+            Rotation = 45,
+            BackgroundColor3 = color,
+            BackgroundTransparency = 1,
+        }, holder)
+        subItems[#subItems + 1] = { obj = d, prop = "BackgroundTransparency", target = 0 }
+    end
+
+    local function subWord(order, text)
+        local group = frame({
+            Size = UDim2.fromOffset(0, 24),
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundTransparency = 1,
+            LayoutOrder = order,
+        }, subRow)
+        new("UIListLayout", {
+            FillDirection = Enum.FillDirection.Horizontal,
+            VerticalAlignment = Enum.VerticalAlignment.Center,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 3),
+        }, group)
+        for i = 1, #text do
+            local label = new("TextLabel", {
+                BackgroundTransparency = 1,
+                Text = string.sub(text, i, i),
+                TextSize = 17,
+                Font = Enum.Font.GothamMedium,
+                TextColor3 = C.Ice,
+                TextTransparency = 1,
+                AutomaticSize = Enum.AutomaticSize.X,
+                Size = UDim2.new(0, 0, 1, 0),
+                LayoutOrder = i,
+            }, group)
+            subItems[#subItems + 1] = { obj = label, prop = "TextTransparency", target = 0.05 }
+        end
+    end
+
+    subLine(1, false)
+    subDiamond(2, 5, C.Light)
+    subWord(3, "universal")
+    subDiamond(4, 7, C.White)
+    subWord(5, "Scripts")
+    subDiamond(6, 5, C.Light)
+    subLine(7, true)
+
+    local function revealSubtitle()
+        for i, item in ipairs(subItems) do
+            task.delay(i * 0.035, function()
+                tw(item.obj, 0.5, { [item.prop] = item.target })
+            end)
+        end
+    end
+
+    local function shockwave(final, thick, time)
+        local f = frame({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromOffset(CX, CY),
+            Size = UDim2.fromOffset(40, 40),
+            BackgroundTransparency = 1,
+        }, stage)
+        round(f)
+        local s = new("UIStroke", { Thickness = thick, Color = C.Frost, Transparency = 0.3 }, f)
+        tw(f, time, { Size = UDim2.fromOffset(final, final) }, Enum.EasingStyle.Quint)
+        tw(s, time, { Transparency = 1, Thickness = 0.5 })
+        task.delay(time + 0.1, function() f:Destroy() end)
+    end
+
+    local function burst(count)
+        for i = 1, count do
+            local angle = rng:NextNumber(0, math.pi * 2)
+            local dist = rng:NextNumber(150, 330)
+            local size = rng:NextInteger(2, 4)
+            local p = frame({
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.fromOffset(CX, CY),
+                Size = UDim2.fromOffset(size, size),
+                BackgroundColor3 = (i % 3 == 0) and C.White or C.Ice,
+            }, stage)
+            round(p)
+            local dur = rng:NextNumber(0.7, 1.2)
+            tw(p, dur, {
+                Position = UDim2.fromOffset(CX + math.cos(angle) * dist, CY + math.sin(angle) * dist),
+            }, Enum.EasingStyle.Quint)
+            tw(p, dur, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            task.delay(dur + 0.1, function() p:Destroy() end)
+        end
+    end
+
+    local function flash(peak, inTime, outTime)
+        tw(flashLayer, inTime, { BackgroundTransparency = 1 - peak })
+        task.delay(inTime, function()
+            tw(flashLayer, outTime, { BackgroundTransparency = 1 })
+        end)
+    end
+
+    local t0 = os.clock()
+    local titleReady = false
+    local last = os.clock()
+
+    local conn = RunService.RenderStepped:Connect(function()
+        local nowT = os.clock()
+        local dt = nowT - last
+        last = nowT
+        local t = nowT - t0
+
+        for _, m in ipairs(mists) do
+            m.obj.Position = UDim2.fromScale(0.5 + math.sin(t * m.speed + m.phase) * m.range, m.y)
+        end
+
+        local starFade = math.clamp((t - 0.2) / 1.2, 0, 1)
+        for _, s in ipairs(stars) do
+            local wave = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(t * s.speed + s.phase))
+            s.obj.BackgroundTransparency = 1 - starFade * wave * s.peak
+        end
+
+        for _, d in ipairs(dust) do
+            d.y = d.y - d.speed * dt
+            if d.y < 0 then d.y = d.y + 1 end
+            d.obj.Position = UDim2.fromScale(d.x + math.sin(t * 0.8 + d.phase) * d.sway, d.y)
+            d.obj.BackgroundTransparency = 1 - starFade * 0.5 * (1 - math.abs(d.y - 0.5) * 2)
+        end
+
+        gradA.Rotation = (t * 70) % 360
+        gradB.Rotation = (-t * 50) % 360
+        dial.Rotation = (t * 4) % 360
+        corePulse.Scale = 1 + math.sin(t * 1.6) * 0.03
+
+        for _, sp in ipairs(sparkles) do
+            if sp.ready then
+                sp.scale.Scale = 1 + math.sin(t * 2.2 + sp.phase) * 0.08
+            end
+        end
+
+        if titleReady then
+            for _, l in ipairs(letters) do
+                local a = 0.86 + 0.05 * math.sin(t * 2 + l.index * 0.5)
+                for _, g in ipairs(l.glows) do
+                    g.BackgroundTransparency = a
+                end
+            end
+        end
+    end)
+
+    at(0, function()
+        tw(content, 0.5, { GroupTransparency = 0 })
+        snd(SFX.WHOOSH, 0.45, 0.9)
+    end)
+
+    at(0.2, function()
+        tw(ringBaseScale, 1.2, { Scale = 1 }, Enum.EasingStyle.Quint)
+        tw(ringBaseStroke, 0.9, { Transparency = 0.7 })
+        tw(ringInScale, 1.4, { Scale = 1 }, Enum.EasingStyle.Quint)
+        tw(ringInStroke, 1.1, { Transparency = 0.7 })
+    end)
+
+    at(0.5, function()
+        tw(coreEntry, 1.6, { Scale = 1 }, Enum.EasingStyle.Quint)
+    end)
+
+    at(0.7, function()
+        tw(ringArcAScale, 1.3, { Scale = 1 }, Enum.EasingStyle.Quint)
+        tw(ringArcAStroke, 0.8, { Transparency = 0 })
+        tw(ringArcBScale, 1.5, { Scale = 1 }, Enum.EasingStyle.Quint)
+        tw(ringArcBStroke, 0.8, { Transparency = 0 })
+    end)
+
+    at(1.0, function()
+        snd(SFX.RISE, 0.35, 1)
+    end)
+
+    for i = 1, 4 do
+        at(0.9 + i * 0.08, function()
+            local sp = sparkles[i]
+            tw(sp.scale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back)
+            task.delay(0.65, function() sp.ready = true end)
+        end)
+    end
+
+    at(1.2, function()
+        lineTop(0.9)
+        tw(sparkTop.scale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back)
+        task.delay(0.65, function() sparkTop.ready = true end)
+    end)
+
+    for i, l in ipairs(letters) do
+        at(1.35 + (i - 1) * 0.09, function()
+            revealLetter(l)
+            snd(SFX.CLICK, 0.2, 0.8 + i * 0.06)
+        end)
+    end
+
+    at(2.3, function()
+        titleReady = true
+        snd(SFX.BOOM, 0.5, 1.1)
+        flash(0.22, 0.05, 0.6)
+        shockwave(760, 3, 1.1)
+        burst(18)
+        sweepShine()
+    end)
+
+    at(2.6, function()
+        revealSubtitle()
+        lineBottom(0.9)
+        tw(sparkBottom.scale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back)
+        task.delay(0.65, function() sparkBottom.ready = true end)
+    end)
+
+    task.wait(4.5)
+
+    tw(music, 0.8, { Volume = 0 })
+    tw(stageScale, 0.8, { Scale = stageScale.Scale * 1.08 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+    tw(content, 0.7, { GroupTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+    task.wait(0.55)
+    tw(bg, 0.35, { BackgroundTransparency = 1 })
+    task.wait(0.4)
+
+    conn:Disconnect()
+    gui:Destroy()
+    introGui = nil
+end
+
+local okIntro, errIntro = pcall(runIntro)
+if not okIntro then
+    warn("[AxxHub] intro:", errIntro)
+    if introGui then pcall(function() introGui:Destroy() end) end
+end
+pcall(function() music:Stop() end)
+pcall(function() music:Destroy() end)
+
+local loadOk, WindUI = pcall(function()
+    return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/download/1.6.66/main.lua"))()
+end)
+if not loadOk or not WindUI then
+    warn("[AxxHub] WindUI NO se cargó:", WindUI)
+    return
+end
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local camera = workspace.CurrentCamera
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    if workspace.CurrentCamera then camera = workspace.CurrentCamera end
+end)
+
+local themeName = "Dark"
+do
+    local violetAccent = Color3.fromHex("#7c3aed")
+    local violetIcon = Color3.fromHex("#a78bfa")
+    pcall(function()
+        local themes = WindUI:GetThemes()
+        local v = themes and themes.Violet
+        if v then
+            if typeof(v.Accent) == "Color3" then violetAccent = v.Accent end
+            if typeof(v.Icon) == "Color3" then violetIcon = v.Icon end
+        end
+    end)
+    local okTheme = pcall(function()
+        WindUI:AddTheme({
+            Name = "AxxNight",
+            Accent = violetAccent,
+            Dialog = Color3.fromHex("#0a0c12"),
+            Outline = Color3.fromHex("#2b2f3a"),
+            Text = Color3.fromHex("#ffffff"),
+            Placeholder = Color3.fromHex("#7d8798"),
+            Background = Color3.fromHex("#050609"),
+            Button = Color3.fromHex("#161b27"),
+            Icon = violetIcon,
+        })
+    end)
+    if okTheme then themeName = "AxxNight" end
+end
+
+local ACCENT  = Color3.fromHex("#9fc3ff")
+local ACCENT2 = Color3.fromHex("#ffffff")
+local SFX = { BOOM="9118823100", WHOOSH="9114663715", CLICK="9125401346", RISE="9045889306" }
+
+local function playSound(id, vol, pitch)
+    local s = Instance.new("Sound")
+    s.SoundId = "rbxassetid://" .. id
+    s.Volume = vol or 0.6
+    s.PlaybackSpeed = pitch or 1
+    s.Parent = SoundService
+    s:Play()
+    task.delay(6, function() if s then s:Destroy() end end)
+end
+
+local Persist = {
+    Items = {},
+    Order = {},
+    Loading = false,
+    Ready = false,
+    Data = nil,
+}
+Persist.Folder = "AxxHub_Configs"
+Persist.File = Persist.Folder .. "/autoload.json"
+
+pcall(function()
+    if isfolder and makefolder and not isfolder(Persist.Folder) then
+        makefolder(Persist.Folder)
+    end
+    if isfile and readfile and isfile(Persist.File) then
+        local decoded = HttpService:JSONDecode(readfile(Persist.File))
+        if type(decoded) == "table" then
+            Persist.Data = decoded
+        end
+    end
+end)
+
+Persist.SettingsFile = Persist.Folder .. "/settings.json"
+Persist.Autoload = true
+Persist.Started = false
+
+pcall(function()
+    if isfile and readfile and isfile(Persist.SettingsFile) then
+        local decoded = HttpService:JSONDecode(readfile(Persist.SettingsFile))
+        if type(decoded) == "table" and type(decoded.Autoload) == "boolean" then
+            Persist.Autoload = decoded.Autoload
+        end
+    end
+end)
+
+local function writeSettings()
+    if not writefile then return end
+    pcall(function()
+        writefile(Persist.SettingsFile, HttpService:JSONEncode({ Autoload = Persist.Autoload }))
+    end)
+end
+
+local function persistSave(force)
+    if (not Persist.Ready and not force) or Persist.Loading or not writefile then return end
+    local values = {}
+    for key, item in pairs(Persist.Items) do
+        local okGet, value = pcall(item.Get)
+        if okGet and value ~= nil then
+            values[key] = value
+        end
+    end
+    local okEnc, encoded = pcall(function()
+        return HttpService:JSONEncode({ Values = values })
+    end)
+    if okEnc then
+        pcall(writefile, Persist.File, encoded)
+    end
+end
+
+local function persist(key, get, set)
+    if not Persist.Items[key] then
+        Persist.Order[#Persist.Order + 1] = key
+    end
+    Persist.Items[key] = { Get = get, Set = set }
+end
+
+local function persistToggle(key, element, get)
+    persist(key, get, function(v)
+        if type(v) == "boolean" and element then
+            pcall(function() element:Set(v) end)
+        end
+    end)
+end
+
+local function persistSlider(key, element, get)
+    persist(key, get, function(v)
+        if type(v) == "number" and element then
+            pcall(function() element:Set(v) end)
+        end
+    end)
+end
+
+local function persistDropdown(key, element, get, apply)
+    persist(key, get, function(v)
+        if v == nil then return end
+        if apply then apply(v) end
+        if element then
+            pcall(function() element:Select(v) end)
+        end
+    end)
+end
+
+local function persistColor(key, element, get, apply)
+    persist(key, function()
+        local c = get()
+        return { R = c.R, G = c.G, B = c.B }
+    end, function(v)
+        if type(v) ~= "table" then return end
+        local c = Color3.new(v.R or 1, v.G or 1, v.B or 1)
+        apply(c)
+        if element then
+            pcall(function() element:Update(c) end)
+        end
+    end)
+end
+
+local winOk, Window = pcall(function()
+    return WindUI:CreateWindow({
+        Title = "Axx Hub",
+        Theme = themeName,
+        Author = "By Axx",
+        Acrylic = false,
+        Transparent = false,
+        NewElements = true,
+        Background = "rbxthumb://type=Asset&id=122217156545284&w=420&h=420",
+        BackgroundImageTransparency = 0.35,
+        OpenButton = {
+            Title = " Axx Hub",
+            Icon = "rbxthumb://type=Asset&id=118232139384203&w=420&h=420",
+            IconSize = 9, CornerRadius = UDim.new(1), StrokeThickness = 2,
+            Enabled = true, Draggable = true, Scale = 0.9,
+            Color = ColorSequence.new(Color3.fromHex("#000000"), Color3.fromHex("#4a6ea8")),
+        },
+        Topbar = { Height = 44, ButtonsType = "Default" },
+    })
+end)
+
+if not winOk or not Window then
+    warn("[AxxHub] CreateWindow falló:", Window)
+    return
+end
+
+local MainSection   = Window:Section({ Title = "FUNCIONES PRINCIPALES", Opened = true })
+local VisualSection = Window:Section({ Title = "VISUALES", Opened = true })
+local SystemSection = Window:Section({ Title = "SISTEMA", Opened = true })
+
+local tabAim      = MainSection:Tab({ Title = "Aimlock",  Icon = "solar:target-bold" })
+local tabCheats   = MainSection:Tab({ Title = "Tramposo", Icon = "solar:bolt-bold" })
+local tabTroll    = MainSection:Tab({ Title = "Trolling", Icon = "solar:fire-bold" })
+local tabESP      = VisualSection:Tab({ Title = "ESP",      Icon = "solar:eye-bold" })
+local tabSky      = VisualSection:Tab({ Title = "Cielos",   Icon = "solar:cloud-bold" })
+local tabFake     = VisualSection:Tab({ Title = "Identidad", Icon = "solar:user-id-bold" })
+local tabBotones  = VisualSection:Tab({ Title = "Botones",  Icon = "solar:gamepad-bold" })
+local tabMusic    = SystemSection:Tab({ Title = "Música",   Icon = "solar:music-note-bold" })
+local tabConfig   = SystemSection:Tab({ Title = "Config",   Icon = "solar:settings-bold" })
+local tabReport   = SystemSection:Tab({ Title = "Reportes", Icon = "solar:chat-square-bold" })
+local tabCreditos = SystemSection:Tab({ Title = "Créditos", Icon = "solar:star-bold" })
+
+local AxxState = {
+    Aim    = { Enabled=false, FOV=200, Smooth=0.35, Target="Auto (Más cercano)", Part="Head", TeamCheck=true, MaxDist=5000 },
+    ESP    = { Enabled=false, Color=Color3.fromRGB(255,255,255), Glow=true, Lines=false, TeamCheck=true, MaxDist=1500 },
+    Cheats = { Speed=false, SpeedValue=16, Jump=false, JumpValue=50, Fly=false, FlySpeed=50, NoClip=false, InfJump=false },
+}
+local AxxToggles = {}
+
+local function estaEnLobby()
+    local char = player.Character
+    if not char then return true end
+    if char:FindFirstChildOfClass("ForceField") then return true end
+    if player.Team then
+        local tName = string.lower(player.Team.Name)
+        if string.find(tName, "lobby")
+            or string.find(tName, "spectat")
+            or string.find(tName, "espectador")
+            or string.find(tName, "menu")
+            or string.find(tName, "dead") then
+            return true
+        end
+    end
+    return false
+end
+
+local function isEnemy(targetPlayer)
+    if targetPlayer == player then return false end
+    if player.Team ~= nil and targetPlayer.Team ~= nil then
+        return player.Team ~= targetPlayer.Team
+    end
+    local pAttr = player:GetAttribute("Team") or player:GetAttribute("team")
+    local tAttr = targetPlayer:GetAttribute("Team") or targetPlayer:GetAttribute("team")
+    if pAttr ~= nil and tAttr ~= nil then
+        return pAttr ~= tAttr
+    end
+    if player.TeamColor.Name ~= "White" and player.TeamColor.Name ~= "Medium stone grey" then
+        return player.TeamColor ~= targetPlayer.TeamColor
+    end
+    return true
+end
+
+local a = AxxState.Aim
+
+local function GetAimPart(character)
+    if not character then return nil end
+    local head = character:FindFirstChild(a.Part)
+    if head then return head end
+    return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function isValidTarget(plr)
+    if not plr or plr == player then return false end
+    local char = plr.Character
+    if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    return GetAimPart(char) ~= nil
+end
+
+local function GetScreenCenter()
+    if not camera then return Vector2.zero end
+    local vs = camera.ViewportSize
+    return Vector2.new(vs.X / 2, vs.Y / 2)
+end
+
+local function DistanceFromCenter(worldPos)
+    if not camera then return math.huge end
+    local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
+    if not onScreen then return math.huge end
+    local center = GetScreenCenter()
+    return (center - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+end
+
+local function FindNearestEnemy(maxDist)
+    maxDist = maxDist or math.huge
+    if a.Target ~= "Auto (Más cercano)" then
+        local specificPlayer = Players:FindFirstChild(a.Target)
+        if specificPlayer and isValidTarget(specificPlayer) then
+            return specificPlayer
+        end
+        return nil
+    end
+    local bestPlayer, bestDist = nil, maxDist
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if isValidTarget(plr) and (not a.TeamCheck or isEnemy(plr)) then
+            local aimPart = GetAimPart(plr.Character)
+            local worldPos = aimPart.Position
+            local myChar = player.Character
+            if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+                local d3 = (myChar.HumanoidRootPart.Position - worldPos).Magnitude
+                if d3 <= a.MaxDist then
+                    local d = DistanceFromCenter(worldPos)
+                    if d < bestDist then
+                        bestDist = d
+                        bestPlayer = plr
+                    end
+                end
+            end
+        end
+    end
+    return bestPlayer
+end
+
+local function GetDropdownPlayers()
+    local list = { "Auto (Más cercano)" }
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then table.insert(list, plr.Name) end
+    end
+    return list
+end
+
+tabAim:Section({ Title = "Aimbot", Icon = "solar:target-bold" })
+AxxToggles.Aim = tabAim:Toggle({
+    Title = "Aimbot",
+    Value = false,
+    Callback = function(v) a.Enabled = v end,
+})
+
+local TargetDropdown = tabAim:Dropdown({
+    Title = "Jugador a Lockear",
+    Values = GetDropdownPlayers(),
+    Value = "Auto (Más cercano)",
+    Callback = function(v) a.Target = v end,
+})
+
+Players.PlayerAdded:Connect(function()
+    task.wait(0.5)
+    pcall(function() TargetDropdown:Refresh(GetDropdownPlayers()) end)
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    task.wait(0.5)
+    pcall(function() TargetDropdown:Refresh(GetDropdownPlayers()) end)
+    if a.Target ~= "Auto (Más cercano)" and not Players:FindFirstChild(a.Target) then
+        a.Target = "Auto (Más cercano)"
+        pcall(function() TargetDropdown:Set("Auto (Más cercano)") end)
+    end
+end)
+
+local SliAimFOV = tabAim:Slider({
+    Title = "Aimbot FOV",
+    Step = 10,
+    Value = { Min = 50, Max = 500, Default = 200 },
+    Callback = function(v) a.FOV = v end,
+})
+
+local SliAimSmooth = tabAim:Slider({
+    Title = "Aimbot Smooth",
+    Step = 0.05,
+    Value = { Min = 0, Max = 1, Default = 0.35 },
+    Callback = function(v) a.Smooth = v end,
+})
+
+local SliAimDist = tabAim:Slider({
+    Title = "Distancia Máx",
+    Step = 100,
+    Value = { Min = 100, Max = 5000, Default = 5000 },
+    Callback = function(v) a.MaxDist = v end,
+})
+
+local TogAimTeam = tabAim:Toggle({
+    Title = "Team Check",
+    Value = true,
+    Callback = function(v) a.TeamCheck = v end,
+})
+
+RunService.RenderStepped:Connect(function()
+    if not a.Enabled or not camera then return end
+    if estaEnLobby() then return end
+    local target = FindNearestEnemy(a.FOV)
+    if not target then return end
+    local aimPart = GetAimPart(target.Character)
+    if not aimPart then return end
+    local camPos = camera.CFrame.Position
+    local targetPos = aimPart.Position
+    local targetDir = (targetPos - camPos).Unit
+    local currentDir = camera.CFrame.LookVector
+    local smooth = math.clamp(a.Smooth, 0, 0.99)
+    local newDir = currentDir:Lerp(targetDir, 1 - smooth)
+    camera.CFrame = CFrame.lookAt(camPos, camPos + newDir)
+end)
+
+persistToggle("Aim_Enabled", AxxToggles.Aim, function() return AxxState.Aim.Enabled end)
+persistSlider("Aim_FOV", SliAimFOV, function() return AxxState.Aim.FOV end)
+persistSlider("Aim_Smooth", SliAimSmooth, function() return AxxState.Aim.Smooth end)
+persistSlider("Aim_MaxDist", SliAimDist, function() return AxxState.Aim.MaxDist end)
+persistToggle("Aim_TeamCheck", TogAimTeam, function() return AxxState.Aim.TeamCheck end)
+persist("Aim_Target", function() return AxxState.Aim.Target end, function(v)
+    if type(v) ~= "string" then return end
+    if v == "Auto (Más cercano)" or Players:FindFirstChild(v) then
+        AxxState.Aim.Target = v
+        pcall(function() TargetDropdown:Set(v) end)
+    else
+        AxxState.Aim.Target = "Auto (Más cercano)"
+    end
+end)
+
+local espState = AxxState.ESP
+
+local espFolder = Instance.new("Folder")
+espFolder.Name = "AxxESPFolder"
+local espScreen = Instance.new("ScreenGui")
+espScreen.Name = "AxxHub_ESP"
+espScreen.ResetOnSpawn = false
+espScreen.IgnoreGuiInset = true
+espScreen.DisplayOrder = 998
+espScreen.Parent = playerGui
+espFolder.Parent = espScreen
+
+local activeESPs = {}
+local tracerLines = {}
+
+local function cleanESP(p)
+    if activeESPs[p] then
+        if activeESPs[p].Highlight then
+            activeESPs[p].Highlight:Destroy()
+        end
+        activeESPs[p] = nil
+    end
+end
+
+tabESP:Section({ Title = "ESP Jugadores", Icon = "solar:eye-bold" })
+AxxToggles.ESP = tabESP:Toggle({
+    Title = "ESP Jugadores",
+    Value = false,
+    Callback = function(v) espState.Enabled = v end,
+})
+
+local ColESP = tabESP:Colorpicker({
+    Title = "Color del ESP",
+    Default = Color3.fromRGB(255,255,255),
+    Callback = function(c) espState.Color = c end,
+})
+
+tabESP:Section({ Title = "Filtros", Icon = "solar:filter-bold" })
+local TogESPGlow = tabESP:Toggle({
+    Title = "Mostrar Resplandor",
+    Value = true,
+    Callback = function(v) espState.Glow = v end,
+})
+
+local TogESPLines = tabESP:Toggle({
+    Title = "Mostrar Líneas",
+    Value = false,
+    Callback = function(v) espState.Lines = v end,
+})
+
+local TogESPTeam = tabESP:Toggle({
+    Title = "Team Check",
+    Value = true,
+    Callback = function(v) espState.TeamCheck = v end,
+})
+
+local SliESPDist = tabESP:Slider({
+    Title = "Distancia Máx",
+    Step = 50,
+    Value = { Min = 100, Max = 5000, Default = 1500 },
+    Callback = function(v) espState.MaxDist = v end,
+})
+
+task.spawn(function()
+    while task.wait(0.2) do
+        local lobby = estaEnLobby()
+        if espState.Enabled and not lobby then
+            local myChar = player.Character
+            local myHead = myChar and myChar:FindFirstChild("Head")
+            local myPos = myHead and myHead.Position
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= player then
+                    local char = p.Character
+                    if char
+                        and char:FindFirstChild("Humanoid")
+                        and char.Humanoid.Health > 0
+                        and char:FindFirstChild("Head")
+                        and (not espState.TeamCheck or isEnemy(p)) then
+                        local targetHead = char.Head
+                        local dist = myPos and (targetHead.Position - myPos).Magnitude or 0
+                        if dist <= espState.MaxDist then
+                            if activeESPs[p] and activeESPs[p].Char ~= char then cleanESP(p) end
+                            if not activeESPs[p] then
+                                local hl = Instance.new("Highlight")
+                                hl.Name = p.Name .. "_Glow"
+                                hl.FillTransparency = 1
+                                hl.OutlineTransparency = 0
+                                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                                hl.Adornee = char
+                                hl.Parent = espFolder
+                                activeESPs[p] = { Highlight = hl, Char = char }
+                            end
+                            local obj = activeESPs[p]
+                            if obj.Highlight.Enabled ~= espState.Glow then
+                                obj.Highlight.Enabled = espState.Glow
+                            end
+                            if obj.Highlight.OutlineColor ~= espState.Color then
+                                obj.Highlight.OutlineColor = espState.Color
+                            end
+                        else
+                            cleanESP(p)
+                        end
+                    else
+                        cleanESP(p)
+                    end
+                end
+            end
+        else
+            for _, p in pairs(Players:GetPlayers()) do cleanESP(p) end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not camera then return end
+    if not espState.Enabled or not espState.Lines or estaEnLobby() then
+        for _, tLine in pairs(tracerLines) do
+            if tLine.Visible then tLine.Visible = false end
+        end
+        return
+    end
+    local myChar = player.Character
+    local myPos = (myChar and myChar.PrimaryPart) and myChar.PrimaryPart.Position or camera.CFrame.Position
+    local centroX = camera.ViewportSize.X / 2
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            local tLine = tracerLines[p]
+            if not tLine then
+                if Drawing then
+                    tLine = Drawing.new("Line")
+                    tLine.Thickness = 1.5
+                    tLine.Transparency = 1
+                    tLine.Visible = false
+                    tracerLines[p] = tLine
+                else
+                    break
+                end
+            end
+            local char = p.Character
+            local hrp = char and char.PrimaryPart
+            if hrp and (not espState.TeamCheck or isEnemy(p)) then
+                local hum = char:FindFirstChild("Humanoid")
+                if hum and hum.Health > 0 then
+                    local hrpPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                    if onScreen then
+                        local dist = (myPos - hrp.Position).Magnitude
+                        if dist <= espState.MaxDist then
+                            tLine.From = Vector2.new(centroX, 0)
+                            tLine.To = Vector2.new(hrpPos.X, hrpPos.Y)
+                            if tLine.Color ~= espState.Color then tLine.Color = espState.Color end
+                            if not tLine.Visible then tLine.Visible = true end
+                            continue
+                        end
+                    end
+                end
+            end
+            if tLine and tLine.Visible then tLine.Visible = false end
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    if tracerLines[p] then
+        pcall(function() tracerLines[p]:Remove() end)
+        tracerLines[p] = nil
+    end
+    cleanESP(p)
+end)
+
+persistToggle("ESP_Enabled", AxxToggles.ESP, function() return AxxState.ESP.Enabled end)
+persistToggle("ESP_Glow", TogESPGlow, function() return AxxState.ESP.Glow end)
+persistToggle("ESP_Lines", TogESPLines, function() return AxxState.ESP.Lines end)
+persistToggle("ESP_TeamCheck", TogESPTeam, function() return AxxState.ESP.TeamCheck end)
+persistSlider("ESP_MaxDist", SliESPDist, function() return AxxState.ESP.MaxDist end)
+persistColor("ESP_Color", ColESP, function() return AxxState.ESP.Color end, function(c) AxxState.ESP.Color = c end)
+
+local ch = AxxState.Cheats
+tabCheats:Section({ Title = "Movimiento", Icon = "solar:walking-bold" })
+
+local TogSpeed = tabCheats:Toggle({ Title="Speed", Value=false, Callback=function(v) ch.Speed = v end })
+local SliSpeed = tabCheats:Slider({ Title="Velocidad", Value={Min=16,Max=200,Default=50}, Callback=function(v) ch.SpeedValue = v end })
+local TogJump = tabCheats:Toggle({ Title="Jump Boost", Value=false, Callback=function(v) ch.Jump = v end })
+local SliJump = tabCheats:Slider({ Title="Salto", Value={Min=50,Max=300,Default=100}, Callback=function(v) ch.JumpValue = v end })
+local TogInfJump = tabCheats:Toggle({ Title="Infinite Jump", Value=false, Callback=function(v) ch.InfJump = v end })
+
+tabCheats:Section({ Title = "Vuelo & Noclip", Icon = "solar:wind-bold" })
+
+local flyBG, flyBV
+local cachedFlyControls = nil
+
+local function stopFly()
+    if flyBG then pcall(function() flyBG:Destroy() end); flyBG = nil end
+    if flyBV then pcall(function() flyBV:Destroy() end); flyBV = nil end
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+    end
+end
+
+local function startFly()
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not (hrp and hum) then return end
+    stopFly()
+    hum.PlatformStand = true
+    flyBG = Instance.
+... (Tiempo restante: 52 KB)
