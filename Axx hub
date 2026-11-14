@@ -1418,5 +1418,1487 @@ local function startFly()
     if not (hrp and hum) then return end
     stopFly()
     hum.PlatformStand = true
-    flyBG = Instance.
-... (Tiempo restante: 52 KB)
+    flyBG = Instance.new("BodyGyro")
+    flyBG.P = 9e4
+    flyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    flyBG.CFrame = hrp.CFrame
+    flyBG.Parent = hrp
+    flyBV = Instance.new("BodyVelocity")
+    flyBV.Velocity = Vector3.zero
+    flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    flyBV.Parent = hrp
+end
+
+local TogFly = tabCheats:Toggle({ Title="Fly", Value=false, Callback=function(v)
+    ch.Fly = v
+    if v then startFly() else stopFly() end
+end })
+
+local SliFlySpeed = tabCheats:Slider({ Title="Velocidad Vuelo", Value={Min=10,Max=300,Default=50}, Callback=function(v) ch.FlySpeed = v end })
+local TogNoClip = tabCheats:Toggle({ Title="NoClip", Value=false, Callback=function(v) ch.NoClip = v end })
+
+AxxToggles.Speed = TogSpeed
+AxxToggles.Fly = TogFly
+
+player.CharacterAdded:Connect(function()
+    if ch.Fly then
+        task.wait(0.3)
+        startFly()
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if ch.InfJump then
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.Jump = true end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if ch.Speed and hum then hum.WalkSpeed = ch.SpeedValue end
+            if ch.Jump  and hum then hum.JumpPower = ch.JumpValue end
+            if ch.NoClip then
+                for _, p in ipairs(char:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = false end
+                end
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not ch.Fly then return end
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not flyBV or not flyBG then return end
+    if flyBV.Parent ~= hrp or flyBG.Parent ~= hrp then return end
+    if not cachedFlyControls then
+        local pScripts = player:FindFirstChild("PlayerScripts")
+        local pModule = pScripts and pScripts:FindFirstChild("PlayerModule")
+        if pModule then
+            pcall(function() cachedFlyControls = require(pModule):GetControls() end)
+        end
+    end
+    if cachedFlyControls and camera then
+        local md = camera.CFrame:VectorToWorldSpace(cachedFlyControls:GetMoveVector())
+        flyBV.Velocity = md * ch.FlySpeed
+        flyBG.CFrame = camera.CFrame
+    end
+end)
+
+persistToggle("Cheat_Speed", TogSpeed, function() return AxxState.Cheats.Speed end)
+persistSlider("Cheat_SpeedValue", SliSpeed, function() return AxxState.Cheats.SpeedValue end)
+persistToggle("Cheat_Jump", TogJump, function() return AxxState.Cheats.Jump end)
+persistSlider("Cheat_JumpValue", SliJump, function() return AxxState.Cheats.JumpValue end)
+persistToggle("Cheat_InfJump", TogInfJump, function() return AxxState.Cheats.InfJump end)
+persistToggle("Cheat_Fly", TogFly, function() return AxxState.Cheats.Fly end)
+persistSlider("Cheat_FlySpeed", SliFlySpeed, function() return AxxState.Cheats.FlySpeed end)
+persistToggle("Cheat_NoClip", TogNoClip, function() return AxxState.Cheats.NoClip end)
+
+tabTroll:Section({ Title = "Fling", Icon = "solar:wind-bold" })
+local currentFlingTarget = nil
+local flingLoop = nil
+local flingBV, flingBAV
+
+local function isPlayerInGame(p)
+    if not p or p == player then return false end
+    if not p.Parent then return false end
+    local char = p.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not (hrp and hum) then return false end
+    if hum.Health <= 0 then return false end
+    return true
+end
+
+local function getInGamePlayers()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if isPlayerInGame(p) then
+            table.insert(list, p)
+        end
+    end
+    return list
+end
+
+local function stopFling()
+    currentFlingTarget = nil
+    if flingLoop then flingLoop:Disconnect(); flingLoop = nil end
+    if flingBV then pcall(function() flingBV:Destroy() end); flingBV = nil end
+    if flingBAV then pcall(function() flingBAV:Destroy() end); flingBAV = nil end
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    pcall(function()
+                        v.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
+                    end)
+                    v.CanCollide = true
+                end
+            end
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+end
+
+local function startFling(targetMode)
+    stopFling()
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not (hrp and hum) then return end
+    hum.PlatformStand = true
+    for _, v in pairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
+            pcall(function()
+                v.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5, 1, 1)
+            end)
+        end
+    end
+    flingBAV = Instance.new("BodyAngularVelocity")
+    flingBAV.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    flingBAV.AngularVelocity = Vector3.new(0, 99999, 0)
+    flingBAV.Parent = hrp
+    flingBV = Instance.new("BodyVelocity")
+    flingBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    flingBV.Velocity = Vector3.zero
+    flingBV.Parent = hrp
+    currentFlingTarget = targetMode
+    local allIndex = 1
+    local tickCounter = 0
+    flingLoop = RunService.Heartbeat:Connect(function()
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            stopFling(); return
+        end
+        local pHum = player.Character:FindFirstChildOfClass("Humanoid")
+        if not pHum or pHum.Health <= 0 then stopFling(); return end
+        local myHrp = player.Character.HumanoidRootPart
+        myHrp.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+        if type(currentFlingTarget) == "userdata" then
+            if isPlayerInGame(currentFlingTarget) then
+                myHrp.CFrame = currentFlingTarget.Character.HumanoidRootPart.CFrame
+                    * CFrame.new(math.random(-1,1), math.random(-1,1), math.random(-1,1))
+            else
+                stopFling()
+            end
+        elseif currentFlingTarget == "All" then
+            local validTargets = getInGamePlayers()
+            if #validTargets > 0 then
+                tickCounter = tickCounter + 1
+                if tickCounter > 15 then allIndex = allIndex + 1; tickCounter = 0 end
+                if allIndex > #validTargets then allIndex = 1 end
+                myHrp.CFrame = validTargets[allIndex].Character.HumanoidRootPart.CFrame
+                    * CFrame.new(math.random(-1,1), math.random(-1,1), math.random(-1,1))
+            else
+                stopFling()
+            end
+        end
+    end)
+end
+
+local TogFlingAll = tabTroll:Toggle({ Title = "Fling a Todos (Servidor)", Value = false, Callback = function(state)
+    if state then startFling("All") else stopFling() end
+end })
+
+tabTroll:Space()
+tabTroll:Divider()
+tabTroll:Space()
+
+tabTroll:Section({ Title = "Fling a Jugador", Icon = "solar:user-x-bold" })
+local selectedFlingTarget = nil
+local FlingDropdown = tabTroll:Dropdown({
+    Title = "Jugador en el servidor",
+    Values = { "Esperando..." },
+    Value = "Esperando...",
+    Callback = function(Value)
+        if Value ~= "Esperando..." and Value ~= "No hay nadie" and Value ~= "Ningún jugador en el servidor" then
+            selectedFlingTarget = Value
+        end
+    end,
+})
+
+local function refreshFlingDropdown()
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then
+            if isPlayerInGame(p) then
+                table.insert(names, p.Name)
+            else
+                table.insert(names, p.Name .. " (sin cuerpo)")
+            end
+        end
+    end
+    if #names == 0 then
+        table.insert(names, "Ningún jugador en el servidor")
+    end
+    pcall(function()
+        FlingDropdown:Refresh(names)
+    end)
+end
+
+Players.PlayerAdded:Connect(function(p)
+    task.wait(0.5)
+    refreshFlingDropdown()
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    task.wait(0.3)
+    refreshFlingDropdown()
+end)
+
+task.spawn(function()
+    task.wait(1)
+    refreshFlingDropdown()
+    local tracked = {}
+    local function trackPlayer(p)
+        if p == player then return end
+        if tracked[p] then return end
+        tracked[p] = true
+        p.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            refreshFlingDropdown()
+        end)
+        p.CharacterRemoving:Connect(function()
+            task.wait(0.3)
+            refreshFlingDropdown()
+        end)
+    end
+    for _, p in ipairs(Players:GetPlayers()) do trackPlayer(p) end
+    Players.PlayerAdded:Connect(trackPlayer)
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(3)
+        refreshFlingDropdown()
+    end
+end)
+
+tabTroll:Toggle({ Title = "Fling al Jugador Seleccionado", Value = false, Callback = function(state)
+    if state then
+        local tP = selectedFlingTarget and Players:FindFirstChild(selectedFlingTarget)
+        if not tP and selectedFlingTarget then
+            local clean = selectedFlingTarget:gsub("%s*%(sin cuerpo%)$", "")
+            tP = Players:FindFirstChild(clean)
+        end
+        if tP and isPlayerInGame(tP) then
+            startFling(tP)
+        else
+            stopFling()
+            
+        end
+    else
+        stopFling()
+    end
+end })
+
+tabTroll:Space()
+tabTroll:Divider()
+tabTroll:Space()
+
+tabTroll:Section({ Title = "Info del Servidor", Icon = "solar:info-circle-bold" })
+local InfoLabel = tabTroll:Paragraph({
+    Title = "Jugadores detectados",
+    Desc = "0 jugadores en el servidor",
+})
+task.spawn(function()
+    while true do
+        task.wait(1)
+        local total = #Players:GetPlayers() - 1
+        local inGame = #getInGamePlayers()
+        local lobby = total - inGame
+        pcall(function()
+            InfoLabel:SetDesc(string.format(
+                "%d en el servidor | %d con cuerpo válido | %d sin personaje",
+                total, inGame, lobby
+            ))
+        end)
+    end
+end)
+
+tabTroll:Space()
+tabTroll:Divider()
+tabTroll:Space()
+
+tabTroll:Section({ Title = "Protección", Icon = "solar:shield-bold" })
+local antiFlingConnection = nil
+tabTroll:Toggle({ Title = "Anti-Fling", Value = false, Callback = function(state)
+    if state then
+        antiFlingConnection = RunService.Stepped:Connect(function()
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= player and p.Character then
+                    for _, part in pairs(p.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then part.CanCollide = false end
+                    end
+                end
+            end
+        end)
+    elseif antiFlingConnection then
+        antiFlingConnection:Disconnect()
+        antiFlingConnection = nil
+    end
+end })
+
+local BTN_SIZE = 56
+local ICON_OFF = Color3.fromRGB(235,235,245)
+local BG_OFF   = Color3.fromRGB(18,18,26)
+local BG_ON    = Color3.fromRGB(30,18,55)
+local TI = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+local floatGui = Instance.new("ScreenGui")
+floatGui.Name = "AxxHub_FloatingButtons"
+floatGui.ResetOnSpawn = false
+floatGui.IgnoreGuiInset = true
+floatGui.DisplayOrder = 1000
+floatGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+floatGui.Enabled = false
+floatGui.Parent = playerGui
+
+local function tween(obj, props, info) TweenService:Create(obj, info or TI, props):Play() end
+
+local function viewport()
+    local vp = floatGui.AbsoluteSize
+    if vp.X < 10 then local cam = workspace.CurrentCamera; vp = cam and cam.ViewportSize or Vector2.new(800,600) end
+    return vp
+end
+
+local function clampPos(x, y)
+    local vp = viewport()
+    return math.clamp(x, 0, math.max(0, vp.X - BTN_SIZE)), math.clamp(y, 0, math.max(0, vp.Y - BTN_SIZE))
+end
+
+local function makeIconKit(holder, paints)
+    local function F(x, y, w, h, round, noPaint)
+        local f = Instance.new("Frame")
+        f.BorderSizePixel = 0; f.BackgroundColor3 = ICON_OFF
+        f.Position = UDim2.fromOffset(x, y); f.Size = UDim2.fromOffset(w, h)
+        if round then local c = Instance.new("UICorner"); c.CornerRadius = round == true and UDim.new(1,0) or UDim.new(0, round); c.Parent = f end
+        f.Parent = holder
+        if not noPaint then paints[#paints+1] = { f, "BackgroundColor3" } end
+        return f
+    end
+    local function R(x, y, w, h, thick)
+        local f = Instance.new("Frame")
+        f.BorderSizePixel = 0; f.BackgroundTransparency = 1
+        f.Position = UDim2.fromOffset(x, y); f.Size = UDim2.fromOffset(w, h)
+        local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(1,0); c.Parent = f
+        local s = Instance.new("UIStroke"); s.Color = ICON_OFF; s.Thickness = thick; s.Parent = f
+        f.Parent = holder
+        paints[#paints+1] = { s, "Color" }
+        return f
+    end
+    return F, R
+end
+
+local Icons = {
+    Aim    = function(F,R) R(2,2,26,26,2.2); F(13,0,2,7); F(13,23,2,7); F(0,13,7,2); F(23,13,7,2); F(12.5,12.5,5,5,true) end,
+    ESP    = function(F,R) R(0,6,30,18,2.4); F(11,11,8,8,true) end,
+    Speed  = function(F,R) F(2,5,12,3,1); F(2,13,14,3,1); F(2,21,16,3,1); F(18,5,10,3,1); F(20,13,8,3,1); F(22,21,6,3,1) end,
+    Fly    = function(F,R) F(13,3,4,22); F(8,3,14,4,1); F(4,10,8,3); F(18,10,8,3); F(2,16,10,3); F(18,16,10,3) end,
+}
+
+local defs = {
+    { Name = "Aim",    StateGet = function() return AxxState.Aim.Enabled end },
+    { Name = "ESP",    StateGet = function() return AxxState.ESP.Enabled end },
+    { Name = "Speed",  StateGet = function() return AxxState.Cheats.Speed end },
+    { Name = "Fly",    StateGet = function() return AxxState.Cheats.Fly end },
+}
+
+local function toggleThing(def)
+    local cur = def.StateGet()
+    local tog = AxxToggles[def.Name]
+    if tog and type(tog.Set) == "function" then
+        local ok = pcall(function() tog:Set(not cur) end)
+        if ok then return end
+    end
+    if def.Name == "Aim" then AxxState.Aim.Enabled = not cur
+    elseif def.Name == "ESP" then AxxState.ESP.Enabled = not cur
+    elseif def.Name == "Speed" then AxxState.Cheats.Speed = not cur
+    elseif def.Name == "Fly" then AxxState.Cheats.Fly = not cur end
+end
+
+local buttons = {}
+local function createButton(def, index)
+    local btn = Instance.new("TextButton")
+    btn.Name = def.Name; btn.Text = ""; btn.AutoButtonColor = false; btn.Active = true
+    btn.BorderSizePixel = 0; btn.BackgroundColor3 = BG_OFF; btn.BackgroundTransparency = 0.12
+    btn.Size = UDim2.fromOffset(BTN_SIZE, BTN_SIZE); btn.Parent = floatGui
+    local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0,16); corner.Parent = btn
+    local stroke = Instance.new("UIStroke"); stroke.Color = Color3.new(1,1,1); stroke.Transparency = 0.75; stroke.Thickness = 1.5; stroke.Parent = btn
+    local scale = Instance.new("UIScale"); scale.Scale = 1; scale.Parent = btn
+    local holder = Instance.new("Frame"); holder.BackgroundTransparency = 1; holder.AnchorPoint = Vector2.new(0.5,0.5); holder.Position = UDim2.fromScale(0.5,0.5); holder.Size = UDim2.fromOffset(30,30); holder.Parent = btn
+    local paints = {}
+    local F, R = makeIconKit(holder, paints)
+    Icons[def.Name](F, R)
+    local function goHome()
+        local vp = viewport()
+        local x, y = clampPos(vp.X - BTN_SIZE - 16, vp.Y * 0.28 + (index-1) * (BTN_SIZE+10))
+        btn.Position = UDim2.fromOffset(x, y)
+    end
+    goHome()
+    local isOn = nil
+    local function setVisual(on, instant)
+        if isOn == on then return end
+        local first = isOn == nil; isOn = on
+        local info = (instant or first) and TweenInfo.new(0) or TI
+        tween(btn, { BackgroundColor3 = on and BG_ON or BG_OFF, BackgroundTransparency = on and 0.05 or 0.12 }, info)
+        tween(stroke, { Color = on and ACCENT or Color3.new(1,1,1), Transparency = on and 0 or 0.75, Thickness = on and 2.5 or 1.5 }, info)
+        for _, p in ipairs(paints) do tween(p[1], { [p[2]] = on and ACCENT2 or ICON_OFF }, info) end
+        if not instant and not first then
+            tween(scale, { Scale = 1.14 }, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out))
+            task.delay(0.1, function() tween(scale, { Scale = 1 }, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)) end)
+        end
+    end
+    local dragging, moved = false, false
+    local dragInput, startMouse, startPos
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        dragging, moved = true, false
+        dragInput = input
+        startMouse = Vector2.new(input.Position.X, input.Position.Y)
+        startPos   = Vector2.new(btn.Position.X.Offset, btn.Position.Y.Offset)
+        tween(scale, { Scale = 0.9 }, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out))
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input ~= dragInput and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+        local delta = Vector2.new(input.Position.X, input.Position.Y) - startMouse
+        if not moved and delta.Magnitude > 7 then moved = true; tween(scale, { Scale = 1.08 }, TweenInfo.new(0.12)) end
+        if moved then local x, y = clampPos(startPos.X + delta.X, startPos.Y + delta.Y); btn.Position = UDim2.fromOffset(x, y) end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if not dragging or input ~= dragInput then return end
+        dragging = false
+        tween(scale, { Scale = 1 }, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out))
+        if not moved then toggleThing(def); task.wait(0.03); setVisual(def.StateGet() == true) end
+    end)
+    setVisual(def.StateGet() == true, true)
+    return {
+        Sync = function() setVisual(def.StateGet() == true) end,
+        Reclamp = function() local x, y = clampPos(btn.Position.X.Offset, btn.Position.Y.Offset); btn.Position = UDim2.fromOffset(x, y) end,
+        Home = goHome,
+        SetVisible = function(v) btn.Visible = v end,
+    }
+end
+
+for i, def in ipairs(defs) do buttons[#buttons+1] = createButton(def, i) end
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if floatGui.Enabled then for _, b in ipairs(buttons) do b.Sync() end end
+    end
+end)
+
+floatGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+    for _, b in ipairs(buttons) do b.Reclamp() end
+end)
+
+tabBotones:Section({ Title = "Botones Flotantes", Icon = "solar:gamepad-bold" })
+local TogFloat = tabBotones:Toggle({
+    Title = "Mostrar botones flotantes", Value = false,
+    Callback = function(v)
+        floatGui.Enabled = v
+        if v then for _, b in ipairs(buttons) do b:Sync() end end
+    end,
+})
+
+local floatLabels = { Aim="Aim", ESP="ESP", Speed="Speed", Fly="Fly" }
+local floatSelected = { "Todos" }
+
+local function applyFloatSelection(list)
+    local set, all = {}, false
+    if type(list) == "string" then list = { list } end
+    local normalized = {}
+    for _, v in ipairs(list or {}) do
+        local name = type(v) == "table" and v.Title or tostring(v)
+        normalized[#normalized+1] = name
+        if name == "Todos" then all = true end
+        set[name] = true
+    end
+    floatSelected = normalized
+    for i, def in ipairs(defs) do buttons[i].SetVisible(all or set[floatLabels[def.Name]] == true) end
+end
+
+local DropFloat = tabBotones:Dropdown({
+    Title = "Botones a mostrar",
+    Values = { "Todos", "Aim", "ESP", "Speed", "Fly" },
+    Value = { "Todos" }, Multi = true,
+    Callback = function(v) applyFloatSelection(v) end,
+})
+
+tabBotones:Button({
+    Title = "Restablecer posiciones", Icon = "solar:refresh-bold",
+    Callback = function()
+        for _, b in ipairs(buttons) do b.Home() end
+        playSound(SFX.CLICK, 0.5, 1.2)
+    end,
+})
+
+persistToggle("Float_Enabled", TogFloat, function() return floatGui.Enabled end)
+persist("Float_Selected", function() return floatSelected end, function(v)
+    applyFloatSelection(v)
+end)
+
+local Songs = {
+    {Name="Canción 1",Id="84944985070181"},{Name="Canción 2",Id="87570666848900"},
+    {Name="Canción 3",Id="82746224492420"},{Name="Canción 4",Id="71393805905055"},
+    {Name="Canción 5",Id="75688616622595"},{Name="Canción 6",Id="135609653444873"},
+    {Name="Canción 7",Id="93699644879957"},{Name="Canción 8",Id="110398343528156"},
+    {Name="Canción 9",Id="138863509657081"},{Name="Canción 10",Id="115440201770223"},
+    {Name="Canción 11",Id="128048502331483"},{Name="Canción 12",Id="135321902579514"},
+    {Name="Canción 13",Id="131465489873214"},
+}
+
+local AxxMusic = SoundService:FindFirstChild("AxxHub_MusicPlayer")
+if not AxxMusic then
+    AxxMusic = Instance.new("Sound")
+    AxxMusic.Name = "AxxHub_MusicPlayer"
+    AxxMusic.Volume = 0.5
+    AxxMusic.Parent = SoundService
+end
+AxxMusic:Stop()
+AxxMusic.SoundId = ""
+
+local musicState = { CurrentIndex = 1, Shuffle = false, Repeat = false, CustomId = "" }
+local musicReady = false
+local lastDropdownSet = 0
+
+local function getSongNames()
+    local n = {}
+    for i, s in ipairs(Songs) do n[i] = s.Name end
+    return n
+end
+
+local DropSongs
+
+local function playSong(index)
+    local song = Songs[index]
+    if not song then return end
+    musicState.CurrentIndex = index
+    AxxMusic:Stop()
+    AxxMusic.SoundId = "rbxassetid://" .. song.Id
+    AxxMusic.TimePosition = 0
+    AxxMusic:Play()
+    lastDropdownSet = os.clock()
+    pcall(function() DropSongs:Set(song.Name) end)
+    
+end
+
+local function nextSong()
+    if musicState.Shuffle then
+        playSong(math.random(1, #Songs))
+    else
+        playSong(musicState.CurrentIndex % #Songs + 1)
+    end
+end
+
+local function prevSong()
+    local idx = musicState.CurrentIndex - 1
+    if idx < 1 then idx = #Songs end
+    playSong(idx)
+end
+
+DropSongs = tabMusic:Dropdown({
+    Title = "Lista de Canciones",
+    Values = getSongNames(),
+    Value = Songs[1].Name,
+    Callback = function(v)
+        if not musicReady then return end
+        if os.clock() - lastDropdownSet < 0.5 then return end
+        for i, s in ipairs(Songs) do
+            if s.Name == v then playSong(i); break end
+        end
+    end,
+})
+
+tabMusic:Section({ Title = "Controles", Icon = "solar:play-bold" })
+tabMusic:Button({ Title="Reproducir / Reanudar", Icon="solar:play-bold", Callback=function()
+    if AxxMusic.SoundId == "" then
+        playSong(musicState.CurrentIndex)
+    elseif AxxMusic.IsPaused then
+        AxxMusic:Resume()
+    elseif not AxxMusic.IsPlaying then
+        AxxMusic:Play()
+    end
+end })
+
+tabMusic:Button({ Title="Pausar", Icon="solar:pause-bold", Callback=function() AxxMusic:Pause() end })
+tabMusic:Button({ Title="Detener", Icon="solar:stop-bold", Callback=function() AxxMusic:Stop() end })
+tabMusic:Button({ Title="Anterior", Icon="solar:skip-previous-bold", Callback=prevSong })
+tabMusic:Button({ Title="Siguiente", Icon="solar:skip-next-bold", Callback=nextSong })
+
+local TogShuffle = tabMusic:Toggle({
+    Title = "Aleatorio", Value = false,
+    Callback = function(v) musicState.Shuffle = v end,
+})
+
+local TogRepeat = tabMusic:Toggle({
+    Title = "Repetir", Value = false,
+    Callback = function(v) musicState.Repeat = v; AxxMusic.Looped = v end,
+})
+
+tabMusic:Section({ Title = "Volumen", Icon = "solar:volume-loud-bold" })
+local SliVol = tabMusic:Slider({
+    Title = "Volumen",
+    Value = { Min = 0, Max = 100, Default = 50 },
+    Step = 1,
+    Callback = function(v) AxxMusic.Volume = math.clamp(v / 100, 0, 1) end,
+})
+
+tabMusic:Section({ Title = "Música Personalizada", Icon = "solar:music-library-bold" })
+tabMusic:Input({
+    Title = "ID de Audio",
+    Value = "",
+    Placeholder = "Ej: 123456789",
+    Callback = function(v) musicState.CustomId = v end,
+})
+
+tabMusic:Button({ Title="Reproducir ID", Icon="solar:play-bold", Callback=function()
+    local id = tostring(musicState.CustomId or ""):match("%d+")
+    if id then
+        AxxMusic:Stop()
+        AxxMusic.SoundId = "rbxassetid://" .. id
+        AxxMusic:Play()
+        
+    end
+end })
+
+tabMusic:Button({ Title="+ Añadir ID a la lista", Icon="solar:add-circle-bold", Callback=function()
+    local id = tostring(musicState.CustomId or ""):match("%d+")
+    if id then
+        local name = "Mi música: " .. id
+        local count = 1
+        for _, s in ipairs(Songs) do if s.Name == name then count = count + 1 end end
+        if count > 1 then name = name .. " #" .. count end
+        table.insert(Songs, { Name = name, Id = id })
+        pcall(function() DropSongs:Refresh(getSongNames()) end)
+        
+    end
+end })
+
+task.delay(1.5, function() musicReady = true end)
+
+local OriginalSky = nil
+for _, obj in ipairs(Lighting:GetChildren()) do
+    if obj:IsA("Sky") then OriginalSky = obj:Clone(); break end
+end
+
+local function applySky(data)
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if obj:IsA("Sky") then obj:Destroy() end
+    end
+    local sky = Instance.new("Sky")
+    for k, v in pairs(data) do
+        if k ~= "Name" then sky[k] = v end
+    end
+    sky.Parent = Lighting
+    
+end
+
+local function restoreSky()
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if obj:IsA("Sky") then obj:Destroy() end
+    end
+    if OriginalSky then OriginalSky:Clone().Parent = Lighting end
+    
+end
+
+local function extraerRobloxId(texto)
+    if not texto then return nil end
+    texto = tostring(texto):gsub("^%s+", ""):gsub("%s+$", "")
+    if texto == "" then return nil end
+
+    local soloNumero = texto:match("^(%d+)$")
+    if soloNumero then return soloNumero end
+
+    local rbxId = texto:match("rbxassetid://(%d+)")
+    if rbxId then return rbxId end
+
+    local libId = texto:match("roblox%.com/library/(%d+)")
+    if libId then return libId end
+
+    local assetId = texto:match("roblox%.com/asset/?%??id=(%d+)")
+    if assetId then return assetId end
+
+    local anyId = texto:match("[%?&]id=(%d+)")
+    if anyId then return anyId end
+
+    return nil
+end
+
+local function esPinterest(texto)
+    if not texto then return false end
+    local t = tostring(texto):lower()
+    return t:find("pinterest.", 1, true) ~= nil
+        or t:find("pin.it", 1, true) ~= nil
+        or t:find("pinimg.com", 1, true) ~= nil
+end
+
+local function extraerUrlPinterest(texto)
+    if not texto then return nil end
+    local directa = texto:match("(https?://[%w%-_%.]*pinimg%.com/[^%s\"'<>]+)")
+    if directa then return directa end
+    return nil
+end
+
+tabSky:Section({ Title = "Presets", Icon = "solar:star-bold" })
+tabSky:Button({ Title="Galaxy Sky", Callback=function()
+    applySky({
+        Name = "Galaxy Sky",
+        SkyboxBk="rbxassetid://159454299", SkyboxDn="rbxassetid://159454296",
+        SkyboxFt="rbxassetid://159454293", SkyboxLf="rbxassetid://159454286",
+        SkyboxRt="rbxassetid://159454300", SkyboxUp="rbxassetid://159454288",
+    })
+end })
+
+tabSky:Button({ Title="Night Sky", Callback=function()
+    applySky({
+        Name = "Night Sky",
+        SkyboxBk="rbxassetid://12064107", SkyboxDn="rbxassetid://12064152",
+        SkyboxFt="rbxassetid://12064121", SkyboxLf="rbxassetid://12063984",
+        SkyboxRt="rbxassetid://12064115", SkyboxUp="rbxassetid://12064131",
+    })
+end })
+
+tabSky:Button({ Title="Restaurar Cielo Original", Callback=restoreSky })
+
+tabSky:Section({ Title = "Cielo Personalizado", Icon = "solar:gallery-bold" })
+
+local skyLinkValue = ""
+
+tabSky:Input({
+    Title = "Link o ID del cielo",
+    Value = "",
+    Placeholder = "ID, link de Roblox o link de Pinterest",
+    Callback = function(v) skyLinkValue = tostring(v or "") end,
+})
+
+tabSky:Button({ Title="Aplicar Mi Cielo", Icon="solar:check-circle-bold", Callback=function()
+    local valor = tostring(skyLinkValue or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if valor == "" then
+        
+        return
+    end
+
+    if esPinterest(valor) then
+        local urlImg = extraerUrlPinterest(valor)
+        if urlImg then
+            local copiar = setclipboard or toclipboard or (syn and syn.write_clipboard)
+            if copiar then pcall(copiar, urlImg) end
+            
+        else
+            
+        end
+        return
+    end
+
+    local id = extraerRobloxId(valor)
+    if id then
+        local assetUrl = "rbxassetid://" .. id
+        applySky({
+            Name = "Cielo custom (" .. id .. ")",
+            SkyboxBk = assetUrl, SkyboxDn = assetUrl, SkyboxFt = assetUrl,
+            SkyboxLf = assetUrl, SkyboxRt = assetUrl, SkyboxUp = assetUrl,
+        })
+        return
+    end
+
+    
+end })
+
+local fakeNameEnabled = false
+local customFakeName = "Tu Nombre"
+local fakeNameMode = "Cambiar solo para mí"
+local fakeNameActive = false
+local fakeOriginalData = {}
+local fakeVisualConnections = {}
+local fakeWatchedTexts = setmetatable({}, { __mode = "k" })
+local fakeReplacePairs = {}
+local fakeNames = {}
+local fakeCounter = 0
+local fakeHumanoidOriginals = setmetatable({}, { __mode = "k" })
+local fakeScanId = 0
+local TEXT_CLASSES = { TextLabel = true, TextBox = true, TextButton = true }
+
+local function fakeSafeReplace(str, find, replace)
+    local safeFind = find:gsub("[%-%^%$%(%)%%%.%[%]%*%+%?]", "%%%1")
+    local safeRep = replace:gsub("%%", "%%%%")
+    return (str:gsub(safeFind, safeRep))
+end
+
+local function fakeIsText(v) return TEXT_CLASSES[v.ClassName] == true end
+
+local function fakeIsOwnRoot(inst)
+    return string.find(inst.Name, "WindUI", 1, true) ~= nil or string.find(inst.Name, "Axx", 1, true) ~= nil
+end
+
+local function fakeIsOwnGui(v)
+    local pg = v:FindFirstAncestorWhichIsA("ScreenGui")
+    if pg and (string.find(pg.Name, "WindUI") or string.find(pg.Name, "Axx")) then return true end
+    return false
+end
+
+local function fakeBaseName()
+    local n = tostring(customFakeName or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if n == "" then return "Anon" end
+    return n
+end
+
+local function fakeAssign(p)
+    if not fakeNames[p] then
+        fakeCounter += 1
+        fakeNames[p] = fakeBaseName() .. "-" .. fakeCounter
+    end
+    return fakeNames[p]
+end
+
+local function fakeFor(p)
+    if fakeNameMode == "Cambiar solo para mí" then
+        if p == player then
+            return fakeBaseName()
+        end
+        return p.Name
+    end
+    if p == player then return fakeBaseName() end
+    if #Players:GetPlayers() <= 1 then return fakeBaseName() end
+    return fakeAssign(p)
+end
+
+local function fakeRebuildPairs()
+    table.clear(fakeReplacePairs)
+    for _, p in ipairs(Players:GetPlayers()) do
+        local fake = fakeFor(p)
+        if fake ~= p.Name then
+            if p.Name ~= "" then
+                fakeReplacePairs[#fakeReplacePairs+1] = { find = p.Name, fake = fake }
+            end
+            if p.DisplayName ~= "" and p.DisplayName ~= p.Name then
+                fakeReplacePairs[#fakeReplacePairs+1] = { find = p.DisplayName, fake = fake }
+            end
+        end
+    end
+    table.sort(fakeReplacePairs, function(a,b) return #a.find > #b.find end)
+    for i, pair in ipairs(fakeReplacePairs) do
+        pair.token = "\1" .. i .. "\2"
+    end
+end
+
+local function fakeApplyReplace(text)
+    local out = text
+    for _, pair in ipairs(fakeReplacePairs) do out = fakeSafeReplace(out, pair.find, pair.token) end
+    for _, pair in ipairs(fakeReplacePairs) do out = fakeSafeReplace(out, pair.token, pair.fake) end
+    return out
+end
+
+local function fakeProcessText(v, trusted)
+    if not fakeIsText(v) then return end
+    if not trusted and fakeIsOwnGui(v) then return end
+    local data = fakeOriginalData[v]
+    if not data then
+        local txt = v.Text
+        if not txt or txt == "" then return end
+        local hasName = false
+        for _, pair in ipairs(fakeReplacePairs) do
+            if string.find(txt, pair.find, 1, true) then hasName = true; break end
+        end
+        if not hasName then return end
+        data = { Text = txt, Applied = nil }
+        fakeOriginalData[v] = data
+    end
+    if fakeNameActive then
+        local newText = fakeApplyReplace(data.Text)
+        data.Applied = newText
+        if v.Text ~= newText then v.Text = newText end
+    else
+        if v.Text ~= data.Text then v.Text = data.Text end
+        fakeOriginalData[v] = nil
+    end
+end
+
+local function fakeWatch(v)
+    if fakeWatchedTexts[v] or not fakeIsText(v) then return end
+    fakeWatchedTexts[v] = true
+    table.insert(fakeVisualConnections, v:GetPropertyChangedSignal("Text"):Connect(function()
+        if not fakeNameActive then return end
+        local data = fakeOriginalData[v]
+        if data and v.Text == data.Applied then return end
+        fakeOriginalData[v] = nil
+        fakeProcessText(v)
+    end))
+end
+
+local function fakeFullScan()
+    fakeScanId += 1
+    local myScan = fakeScanId
+    for v in pairs(fakeOriginalData) do
+        if v.Parent then fakeProcessText(v) else fakeOriginalData[v] = nil end
+    end
+    local roots = {}
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then
+        for _, c in ipairs(pGui:GetChildren()) do
+            if not fakeIsOwnRoot(c) then roots[#roots+1] = c end
+        end
+    end
+    local okCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
+    if okCore and coreGui then
+        local okKids, kids = pcall(function() return coreGui:GetChildren() end)
+        if okKids then
+            for _, c in ipairs(kids) do
+                if not fakeIsOwnRoot(c) then roots[#roots+1] = c end
+            end
+        end
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then roots[#roots+1] = p.Character end
+    end
+    local sliceStart = os.clock()
+    for _, root in ipairs(roots) do
+        local okDesc, desc = pcall(function() return root:GetDescendants() end)
+        if okDesc then
+            for i = 1, #desc do
+                local v = desc[i]
+                if TEXT_CLASSES[v.ClassName] then
+                    fakeProcessText(v, true)
+                    fakeWatch(v)
+                end
+                if os.clock() - sliceStart > 0.006 then
+                    task.wait()
+                    if not fakeNameActive or myScan ~= fakeScanId then return end
+                    sliceStart = os.clock()
+                end
+            end
+        end
+    end
+end
+
+local function fakeQuickRefresh()
+    fakeScanId += 1
+    local myScan = fakeScanId
+    local list = {}
+    for v in pairs(fakeWatchedTexts) do list[#list+1] = v end
+    local sliceStart = os.clock()
+    for i = 1, #list do
+        local v = list[i]
+        if v.Parent then fakeProcessText(v, true) else fakeOriginalData[v] = nil end
+        if os.clock() - sliceStart > 0.006 then
+            task.wait()
+            if not fakeNameActive or myScan ~= fakeScanId then return end
+            sliceStart = os.clock()
+        end
+    end
+end
+
+local function fakeOnAdded(obj)
+    if not fakeNameActive then return end
+    if fakeIsText(obj) then
+        task.spawn(function()
+            if not fakeNameActive then return end
+            if fakeIsOwnGui(obj) then return end
+            fakeProcessText(obj, true)
+            fakeWatch(obj)
+        end)
+    end
+end
+
+local function fakeApplyHumanoidNames()
+    for _, p in ipairs(Players:GetPlayers()) do
+        local char = p.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local fake = fakeFor(p)
+            if fake ~= p.Name then
+                if fakeHumanoidOriginals[hum] == nil then
+                    fakeHumanoidOriginals[hum] = hum.DisplayName
+                end
+                if hum.DisplayName ~= fake then hum.DisplayName = fake end
+            elseif fakeHumanoidOriginals[hum] ~= nil then
+                pcall(function() hum.DisplayName = fakeHumanoidOriginals[hum] end)
+                fakeHumanoidOriginals[hum] = nil
+            end
+        end
+    end
+end
+
+local function fakeRestoreHumanoidNames()
+    for hum, name in pairs(fakeHumanoidOriginals) do
+        if hum.Parent then pcall(function() hum.DisplayName = name end) end
+    end
+    table.clear(fakeHumanoidOriginals)
+end
+
+local function fakeConnectWatchers()
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then table.insert(fakeVisualConnections, pGui.DescendantAdded:Connect(fakeOnAdded)) end
+    pcall(function()
+        local cg = game:GetService("CoreGui")
+        table.insert(fakeVisualConnections, cg.DescendantAdded:Connect(fakeOnAdded))
+    end)
+    local function hookChar(p)
+        table.insert(fakeVisualConnections, p.CharacterAdded:Connect(function(char)
+            if not fakeNameActive then return end
+            local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
+            if not hum or not fakeNameActive then return end
+            local fake = fakeFor(p)
+            if fake ~= p.Name then
+                if fakeHumanoidOriginals[hum] == nil then
+                    fakeHumanoidOriginals[hum] = hum.DisplayName
+                end
+                if hum.DisplayName ~= fake then hum.DisplayName = fake end
+            end
+        end))
+    end
+    for _, p in ipairs(Players:GetPlayers()) do hookChar(p) end
+    local function playersChanged()
+        if not fakeNameActive then return end
+        fakeRebuildPairs()
+        pcall(fakeApplyHumanoidNames)
+        task.spawn(fakeQuickRefresh)
+        task.delay(0.5, function()
+            if fakeNameActive then task.spawn(fakeFullScan) end
+        end)
+    end
+    table.insert(fakeVisualConnections, Players.PlayerAdded:Connect(function(p)
+        hookChar(p)
+        playersChanged()
+    end))
+    table.insert(fakeVisualConnections, Players.PlayerRemoving:Connect(function()
+        task.defer(playersChanged)
+    end))
+end
+
+local function fakeStartLoop()
+    task.spawn(function()
+        while fakeNameActive do
+            pcall(fakeApplyHumanoidNames)
+            task.wait(0.3)
+        end
+    end)
+end
+
+local function fakeUpdateSystem()
+    if fakeNameEnabled then
+        if not fakeNameActive then
+            fakeNameActive = true
+            table.clear(fakeNames)
+            fakeCounter = 0
+            fakeRebuildPairs()
+            fakeConnectWatchers()
+            fakeStartLoop()
+        else
+            table.clear(fakeNames)
+            fakeCounter = 0
+            fakeRebuildPairs()
+        end
+        task.spawn(fakeFullScan)
+    elseif fakeNameActive then
+        fakeNameActive = false
+        for _, c in ipairs(fakeVisualConnections) do c:Disconnect() end
+        fakeVisualConnections = {}
+        table.clear(fakeWatchedTexts)
+        for v, data in pairs(fakeOriginalData) do
+            if v and v.Parent and v.Text ~= data.Text then
+                pcall(function() v.Text = data.Text end)
+            end
+        end
+        fakeOriginalData = {}
+        fakeRestoreHumanoidNames()
+        table.clear(fakeReplacePairs)
+        table.clear(fakeNames)
+        fakeCounter = 0
+    end
+end
+
+local function fakeRefreshMode()
+    if not fakeNameEnabled then return end
+    table.clear(fakeNames)
+    fakeCounter = 0
+    fakeRebuildPairs()
+    pcall(fakeApplyHumanoidNames)
+    task.spawn(fakeFullScan)
+end
+
+tabFake:Section({ Title = "Editar tu nombre", Icon = "solar:user-id-bold" })
+
+local InpFake = tabFake:Input({
+    Title = "Editar tu nombre",
+    Value = customFakeName,
+    Placeholder = "Ej: Papá Pitufo",
+    Callback = function(v)
+        customFakeName = tostring(v or "")
+        if fakeNameEnabled then fakeRefreshMode() end
+    end,
+})
+
+local DropFakeMode = tabFake:Dropdown({
+    Title = "Modo",
+    Values = { "Cambiar solo para mí", "Cambiar para todos" },
+    Value = fakeNameMode,
+    Callback = function(v)
+        fakeNameMode = v
+        fakeRefreshMode()
+    end,
+})
+
+local TogFake = tabFake:Toggle({
+    Title = "Activar Nombre Falso",
+    Value = false,
+    Callback = function(v)
+        fakeNameEnabled = v
+        fakeUpdateSystem()
+        playSound(SFX.CLICK, 0.5, 1.1)
+    end,
+})
+
+persistToggle("FakeName_Enabled", TogFake, function() return fakeNameEnabled end)
+persistDropdown("FakeName_Mode", DropFakeMode, function() return fakeNameMode end, function(v)
+    fakeNameMode = v
+    if fakeNameEnabled then task.spawn(fakeRefreshMode) end
+end)
+persist("FakeName_Custom", function() return customFakeName end, function(v)
+    if type(v) == "string" then
+        customFakeName = v
+        pcall(function() InpFake:Set(v) end)
+        if fakeNameEnabled then
+            task.spawn(fakeRefreshMode)
+        end
+    end
+end)
+
+player.CharacterAdded:Connect(function()
+    if fakeNameEnabled then
+        task.wait(1)
+        fakeUpdateSystem()
+    end
+end)
+
+tabCreditos:Section({ Title = "Equipo", Icon = "solar:users-group-rounded-bold" })
+tabCreditos:Paragraph({ Title = "Founder", Desc = "Axx", Icon = "solar:star-bold", Image = "solar:star-bold", ImageSize = 22 })
+tabCreditos:Paragraph({ Title = "Owner", Desc = "nexvyr", Icon = "solar:crown-bold", Image = "solar:crown-bold", ImageSize = 22 })
+tabCreditos:Paragraph({ Title = "Developer", Desc = "Lexi", Icon = "solar:code-square-bold", Image = "solar:code-square-bold", ImageSize = 22 })
+
+local function resetAllSettings()
+    if Persist.Loading then
+        
+        return
+    end
+
+    AxxState.Aim.Enabled = false
+    AxxState.Aim.FOV = 200
+    AxxState.Aim.Smooth = 0.35
+    AxxState.Aim.Target = "Auto (Más cercano)"
+    AxxState.Aim.Part = "Head"
+    AxxState.Aim.TeamCheck = true
+    AxxState.Aim.MaxDist = 5000
+
+    AxxState.ESP.Enabled = false
+    AxxState.ESP.Color = Color3.fromRGB(255,255,255)
+    AxxState.ESP.Glow = true
+    AxxState.ESP.Lines = false
+    AxxState.ESP.TeamCheck = true
+    AxxState.ESP.MaxDist = 1500
+
+    AxxState.Cheats.Speed = false
+    AxxState.Cheats.SpeedValue = 16
+    AxxState.Cheats.Jump = false
+    AxxState.Cheats.JumpValue = 50
+    AxxState.Cheats.Fly = false
+    AxxState.Cheats.FlySpeed = 50
+    AxxState.Cheats.NoClip = false
+    AxxState.Cheats.InfJump = false
+
+    pcall(function() AxxToggles.Aim:Set(false) end)
+    pcall(function() TargetDropdown:Set("Auto (Más cercano)") end)
+    pcall(function() SliAimFOV:Set(200) end)
+    pcall(function() SliAimSmooth:Set(0.35) end)
+    pcall(function() SliAimDist:Set(5000) end)
+    pcall(function() TogAimTeam:Set(true) end)
+
+    pcall(function() AxxToggles.ESP:Set(false) end)
+    pcall(function() ColESP:Update(Color3.fromRGB(255,255,255)) end)
+    pcall(function() TogESPGlow:Set(true) end)
+    pcall(function() TogESPLines:Set(false) end)
+    pcall(function() TogESPTeam:Set(true) end)
+    pcall(function() SliESPDist:Set(1500) end)
+
+    pcall(function() TogSpeed:Set(false) end)
+    pcall(function() SliSpeed:Set(16) end)
+    pcall(function() TogJump:Set(false) end)
+    pcall(function() SliJump:Set(50) end)
+    pcall(function() TogInfJump:Set(false) end)
+    pcall(function() TogFly:Set(false) end)
+    pcall(function() SliFlySpeed:Set(50) end)
+    pcall(function() TogNoClip:Set(false) end)
+
+    pcall(function() TogFloat:Set(false) end)
+    pcall(function() applyFloatSelection({ "Todos" }) end)
+    floatGui.Enabled = false
+
+    fakeNameEnabled = false
+    customFakeName = "Tu Nombre"
+    fakeNameMode = "Cambiar solo para mí"
+    if TogFake then pcall(function() TogFake:Set(false) end) end
+    if InpFake then pcall(function() InpFake:Set("Tu Nombre") end) end
+    if DropFakeMode then pcall(function() DropFakeMode:Select("Cambiar solo para mí") end) end
+    fakeUpdateSystem()
+
+    pcall(function() AxxMusic:Stop() end)
+    pcall(function() restoreSky() end)
+
+    pcall(function()
+        for _, p in pairs(Players:GetPlayers()) do cleanESP(p) end
+    end)
+
+    pcall(function()
+        stopFly()
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.PlatformStand = false
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+            hum.JumpHeight = 7.2
+        end
+    end)
+
+    pcall(function() stopFling() end)
+    pcall(function()
+        if antiFlingConnection then
+            antiFlingConnection:Disconnect()
+            antiFlingConnection = nil
+        end
+    end)
+
+    pcall(function()
+        if delfile and isfile and isfile(Persist.File) then
+            delfile(Persist.File)
+        end
+    end)
+
+    task.delay(0.2, function()
+        Persist.Ready = Persist.Autoload
+        pcall(persistSave)
+    end)
+
+    
+
+    playSound(SFX.CLICK, 0.6, 1.1)
+end
+
+tabConfig:Section({ Title = "Resetear Configuración", Icon = "solar:restart-bold" })
+tabConfig:Button({
+    Title = "Resetear toda la configuración",
+    Icon = "solar:refresh-bold",
+    Callback = function()
+        resetAllSettings()
+    end,
+})
+
+local function readSaved()
+    local ok, decoded = pcall(function()
+        if isfile and readfile and isfile(Persist.File) then
+            return HttpService:JSONDecode(readfile(Persist.File))
+        end
+    end)
+    if ok and type(decoded) == "table" then return decoded end
+    return nil
+end
+
+local function applySaved(data)
+    local loadedCount = 0
+    if type(data) ~= "table" or type(data.Values) ~= "table" then return 0 end
+    Persist.Loading = true
+    for _, key in ipairs(Persist.Order) do
+        local item = Persist.Items[key]
+        local value = data.Values[key]
+        if item and value ~= nil then
+            local ok = pcall(item.Set, value)
+            if ok then loadedCount += 1 end
+            if loadedCount % 6 == 0 then
+                RunService.Heartbeat:Wait()
+            end
+        end
+    end
+    Persist.Loading = false
+    return loadedCount
+end
+
+tabConfig:Section({ Title = "Autoload", Icon = "solar:download-bold" })
+tabConfig:Toggle({
+    Title = "Autoload",
+    Value = Persist.Autoload,
+    Callback = function(v)
+        if not Persist.Started then return end
+        Persist.Autoload = v
+        writeSettings()
+        if v then
+            Persist.Ready = true
+            persistSave()
+        else
+            Persist.Ready = false
+        end
+    end,
+})
+tabConfig:Button({
+    Title = "Guardar configuración",
+    Icon = "solar:download-bold",
+    Callback = function()
+        persistSave(true)
+    end,
+})
+tabConfig:Button({
+    Title = "Cargar configuración",
+    Icon = "solar:refresh-bold",
+    Callback = function()
+        if Persist.Loading then return end
+        applySaved(readSaved())
+    end,
+})
+
+task.spawn(function()
+    task.wait(0.4)
+    if Persist.Autoload then
+        applySaved(Persist.Data)
+        Persist.Ready = true
+        persistSave()
+    end
+    Persist.Started = true
+
+    task.spawn(function()
+        while true do
+            task.wait(5)
+            persistSave()
+        end
+    end)
+
+    Players.PlayerRemoving:Connect(function(p)
+        if p == player then persistSave() end
+    end)
+end)
+
+do
+    local MarketplaceService = game:GetService("MarketplaceService")
+    local WEBHOOK = "https://discord.com/api/webhooks/1570603637816823900/g4md-7SkqppeEzPPeb6Eu_O4EjueYzqmaoHdVYovX_h_DwIdXnEmKnwf12Mp8_6E1EKS"
+    local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
+
+    local function getAvatar(userId)
+        local okA, res = pcall(function()
+            local r = httpRequest({
+                Url = ("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png"):format(userId),
+                Method = "GET"
+            })
+            return HttpService:JSONDecode(r.Body).data[1].imageUrl
+        end)
+        return okA and res or nil
+    end
+
+    local function getGameInfo()
+        local name = "Desconocido"
+        pcall(function()
+            name = MarketplaceService:GetProductInfo(game.PlaceId).Name
+        end)
+        return name
+    end
+
+    local function sendReport(message)
+        if not httpRequest then return false, "Tu executor no soporta HTTP" end
+
+        local executor = (identifyexecutor and identifyexecutor()) or "Desconocido"
+        local avatar = getAvatar(player.UserId)
+        local gameName = getGameInfo()
+
+        local embed = {
+            title = "Axx Hub | Bug Report / Suggestion",
+            color = 0xE74C3C,
+            thumbnail = avatar and { url = avatar } or nil,
+            fields = {
+                {
+                    name = "Repositorio",
+                    value = ("**Display:** %s\n**Usuario:** %s\n**ID:** %d"):format(player.DisplayName, player.Name, player.UserId),
+                    inline = false
+                },
+                {
+                    name = "Juego",
+                    value = ("[%s](https://www.roblox.com/games/%d)\n**PlaceId:** %d"):format(gameName, game.PlaceId, game.PlaceId),
+                    inline = false
+                },
+                { name = "Executor", value = executor, inline = false },
+                { name = "Message", value = string.sub(message, 1, 1000), inline = false },
+            },
+            timestamp = DateTime.now():ToIsoDate()
+        }
+
+        return pcall(function()
+            httpRequest({
+                Url = WEBHOOK,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode({ username = "Captain Hook", embeds = { embed } })
+            })
+        end)
+    end
+
+    tabReport:Section({ Title = "Cuéntanos qué pasó", Icon = "solar:chat-square-bold" })
+
+    tabReport:Paragraph({
+        Title = "Tu opinión construye el hub",
+        Desc = "¿Algo no funciona como debería o tienes una idea que lo haría mejor? Escríbelo aquí con el mayor detalle posible: qué estabas haciendo, en qué juego y qué esperabas que pasara. Cada mensaje se lee uno por uno."
+    })
+
+    local reportText = ""
+    local lastSent = 0
+
+    tabReport:Input({
+        Title = "Tu mensaje",
+        Desc = "Describe el bug o tu sugerencia",
+        Placeholder = "Ej: el aimbot se desactiva al morir...",
+        Type = "Textarea",
+        Callback = function(text)
+            reportText = text or ""
+        end
+    })
+
+    tabReport:Button({
+        Title = "Enviar reporte",
+        Callback = function()
+            local text = reportText:gsub("^%s+", ""):gsub("%s+$", "")
+
+            if #text < 5 then
+                
+                return
+            end
+            if os.clock() - lastSent < 10 then
+                
+                return
+            end
+
+            lastSent = os.clock()
+            local okS, err = sendReport(text)
+
+            if okS then
+                
+            else
+                
+            end
+        end
+    })
+end
+
