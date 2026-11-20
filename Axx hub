@@ -780,7 +780,7 @@ local function runIntro()
         task.delay(0.65, function() sparkBottom.ready = true end)
     end)
 
-    task.wait(4.5)
+    task.wait(4)
 
     tw(music, 0.8, { Volume = 0 })
     tw(stageScale, 0.8, { Scale = stageScale.Scale * 1.08 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -815,7 +815,6 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
-local Lighting = game:GetService("Lighting")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -998,20 +997,21 @@ if not winOk or not Window then
     return
 end
 
+-- Categorías (Sections)
 local MainSection   = Window:Section({ Title = "FUNCIONES PRINCIPALES", Opened = true })
+local CheatsSection = Window:Section({ Title = "TRAMPOSO", Opened = true })
 local VisualSection = Window:Section({ Title = "VISUALES", Opened = true })
 local SystemSection = Window:Section({ Title = "SISTEMA", Opened = true })
 
+-- Tabs
 local tabAim      = MainSection:Tab({ Title = "Aimlock",  Icon = "solar:target-bold" })
-local tabCheats   = MainSection:Tab({ Title = "Tramposo", Icon = "solar:bolt-bold" })
 local tabTroll    = MainSection:Tab({ Title = "Trolling", Icon = "solar:fire-bold" })
+local tabCheats   = CheatsSection:Tab({ Title = "Tramposo", Icon = "solar:bolt-bold" })
 local tabESP      = VisualSection:Tab({ Title = "ESP",      Icon = "solar:eye-bold" })
-local tabSky      = VisualSection:Tab({ Title = "Cielos",   Icon = "solar:cloud-bold" })
 local tabFake     = VisualSection:Tab({ Title = "Identidad", Icon = "solar:user-id-bold" })
 local tabBotones  = VisualSection:Tab({ Title = "Botones",  Icon = "solar:gamepad-bold" })
 local tabMusic    = SystemSection:Tab({ Title = "Música",   Icon = "solar:music-note-bold" })
 local tabConfig   = SystemSection:Tab({ Title = "Config",   Icon = "solar:settings-bold" })
-local tabReport   = SystemSection:Tab({ Title = "Reportes", Icon = "solar:chat-square-bold" })
 local tabCreditos = SystemSection:Tab({ Title = "Créditos", Icon = "solar:star-bold" })
 
 local AxxState = {
@@ -1386,7 +1386,14 @@ persistToggle("ESP_TeamCheck", TogESPTeam, function() return AxxState.ESP.TeamCh
 persistSlider("ESP_MaxDist", SliESPDist, function() return AxxState.ESP.MaxDist end)
 persistColor("ESP_Color", ColESP, function() return AxxState.ESP.Color end, function(c) AxxState.ESP.Color = c end)
 
+-- ============================================================
+-- CHEATS con fix: restaura velocidad/salto original al desactivar
+-- ============================================================
 local ch = AxxState.Cheats
+
+local SpeedOriginal = nil
+local JumpOriginal = nil
+
 tabCheats:Section({ Title = "Movimiento", Icon = "solar:walking-bold" })
 
 local TogSpeed = tabCheats:Toggle({ Title="Speed", Value=false, Callback=function(v) ch.Speed = v end })
@@ -1441,6 +1448,8 @@ AxxToggles.Speed = TogSpeed
 AxxToggles.Fly = TogFly
 
 player.CharacterAdded:Connect(function()
+    SpeedOriginal = nil
+    JumpOriginal = nil
     if ch.Fly then
         task.wait(0.3)
         startFly()
@@ -1461,11 +1470,31 @@ task.spawn(function()
         local char = player.Character
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
-            if ch.Speed and hum then hum.WalkSpeed = ch.SpeedValue end
-            if ch.Jump  and hum then hum.JumpPower = ch.JumpValue end
-            if ch.NoClip then
-                for _, p in ipairs(char:GetDescendants()) do
-                    if p:IsA("BasePart") then p.CanCollide = false end
+            if hum then
+                if ch.Speed then
+                    if SpeedOriginal == nil then
+                        SpeedOriginal = hum.WalkSpeed
+                    end
+                    hum.WalkSpeed = ch.SpeedValue
+                elseif SpeedOriginal ~= nil then
+                    hum.WalkSpeed = SpeedOriginal
+                    SpeedOriginal = nil
+                end
+
+                if ch.Jump then
+                    if JumpOriginal == nil then
+                        JumpOriginal = hum.JumpPower
+                    end
+                    hum.JumpPower = ch.JumpValue
+                elseif JumpOriginal ~= nil then
+                    hum.JumpPower = JumpOriginal
+                    JumpOriginal = nil
+                end
+
+                if ch.NoClip then
+                    for _, p in ipairs(char:GetDescendants()) do
+                        if p:IsA("BasePart") then p.CanCollide = false end
+                    end
                 end
             end
         end
@@ -1702,7 +1731,6 @@ tabTroll:Toggle({ Title = "Fling al Jugador Seleccionado", Value = false, Callba
             startFling(tP)
         else
             stopFling()
-            
         end
     else
         stopFling()
@@ -1957,6 +1985,9 @@ persist("Float_Selected", function() return floatSelected end, function(v)
     applyFloatSelection(v)
 end)
 
+-- ============================================================
+-- MÚSICA con fix: espera carga antes de Play + status visible
+-- ============================================================
 local Songs = {
     {Name="Canción 1",Id="84944985070181"},{Name="Canción 2",Id="87570666848900"},
     {Name="Canción 3",Id="82746224492420"},{Name="Canción 4",Id="71393805905055"},
@@ -1981,6 +2012,15 @@ local musicState = { CurrentIndex = 1, Shuffle = false, Repeat = false, CustomId
 local musicReady = false
 local lastDropdownSet = 0
 
+local MusicStatus = tabMusic:Paragraph({
+    Title = "Estado de música",
+    Desc = "Elige una canción para empezar",
+})
+
+local function setMusicStatus(desc)
+    pcall(function() MusicStatus:SetDesc(desc) end)
+end
+
 local function getSongNames()
     local n = {}
     for i, s in ipairs(Songs) do n[i] = s.Name end
@@ -1995,11 +2035,68 @@ local function playSong(index)
     musicState.CurrentIndex = index
     AxxMusic:Stop()
     AxxMusic.SoundId = "rbxassetid://" .. song.Id
-    AxxMusic.TimePosition = 0
-    AxxMusic:Play()
     lastDropdownSet = os.clock()
     pcall(function() DropSongs:Set(song.Name) end)
-    
+    setMusicStatus("Cargando " .. song.Name .. "...")
+
+    local thisId = "rbxassetid://" .. song.Id
+    task.spawn(function()
+        local t0 = os.clock()
+        while os.clock() - t0 < 4 do
+            if AxxMusic.SoundId ~= thisId then return end
+            if AxxMusic.Loaded and AxxMusic.TimeLength > 0 then
+                local ok = pcall(function()
+                    AxxMusic.TimePosition = 0
+                    AxxMusic:Play()
+                end)
+                if ok then
+                    setMusicStatus("▶ " .. song.Name .. " (ID " .. song.Id .. ")")
+                else
+                    setMusicStatus("⚠ Error al reproducir: " .. song.Name)
+                end
+                return
+            end
+            task.wait(0.1)
+        end
+        if AxxMusic.SoundId == thisId then
+            setMusicStatus("⚠ No disponible (privado, eliminado o inválido): " .. song.Name)
+            warn("[AxxMusic] No se pudo cargar:", song.Name, "ID:", song.Id)
+        end
+    end)
+end
+
+local function playCustomId(id)
+    id = tostring(id or ""):match("%d+")
+    if not id then return end
+    AxxMusic:Stop()
+    AxxMusic.SoundId = "rbxassetid://" .. id
+    lastDropdownSet = os.clock()
+    setMusicStatus("Cargando ID " .. id .. "...")
+
+    local thisId = "rbxassetid://" .. id
+    task.spawn(function()
+        local t0 = os.clock()
+        while os.clock() - t0 < 4 do
+            if AxxMusic.SoundId ~= thisId then return end
+            if AxxMusic.Loaded and AxxMusic.TimeLength > 0 then
+                local ok = pcall(function()
+                    AxxMusic.TimePosition = 0
+                    AxxMusic:Play()
+                end)
+                if ok then
+                    setMusicStatus("▶ ID " .. id)
+                else
+                    setMusicStatus("⚠ Error al reproducir ID " .. id)
+                end
+                return
+            end
+            task.wait(0.1)
+        end
+        if AxxMusic.SoundId == thisId then
+            setMusicStatus("⚠ ID no disponible: " .. id)
+            warn("[AxxMusic] ID inválido o privado:", id)
+        end
+    end)
 end
 
 local function nextSong()
@@ -2030,18 +2127,27 @@ DropSongs = tabMusic:Dropdown({
 })
 
 tabMusic:Section({ Title = "Controles", Icon = "solar:play-bold" })
+
 tabMusic:Button({ Title="Reproducir / Reanudar", Icon="solar:play-bold", Callback=function()
     if AxxMusic.SoundId == "" then
         playSong(musicState.CurrentIndex)
     elseif AxxMusic.IsPaused then
-        AxxMusic:Resume()
+        pcall(function() AxxMusic:Resume() end)
+        setMusicStatus("▶ Reanudado")
     elseif not AxxMusic.IsPlaying then
-        AxxMusic:Play()
+        pcall(function() AxxMusic:Play() end)
+        setMusicStatus("▶ Reproduciendo")
     end
 end })
 
-tabMusic:Button({ Title="Pausar", Icon="solar:pause-bold", Callback=function() AxxMusic:Pause() end })
-tabMusic:Button({ Title="Detener", Icon="solar:stop-bold", Callback=function() AxxMusic:Stop() end })
+tabMusic:Button({ Title="Pausar", Icon="solar:pause-bold", Callback=function()
+    pcall(function() AxxMusic:Pause() end)
+    setMusicStatus("⏸ Pausado")
+end })
+tabMusic:Button({ Title="Detener", Icon="solar:stop-bold", Callback=function()
+    pcall(function() AxxMusic:Stop() end)
+    setMusicStatus("⏹ Detenido")
+end })
 tabMusic:Button({ Title="Anterior", Icon="solar:skip-previous-bold", Callback=prevSong })
 tabMusic:Button({ Title="Siguiente", Icon="solar:skip-next-bold", Callback=nextSong })
 
@@ -2072,13 +2178,7 @@ tabMusic:Input({
 })
 
 tabMusic:Button({ Title="Reproducir ID", Icon="solar:play-bold", Callback=function()
-    local id = tostring(musicState.CustomId or ""):match("%d+")
-    if id then
-        AxxMusic:Stop()
-        AxxMusic.SoundId = "rbxassetid://" .. id
-        AxxMusic:Play()
-        
-    end
+    playCustomId(musicState.CustomId)
 end })
 
 tabMusic:Button({ Title="+ Añadir ID a la lista", Icon="solar:add-circle-bold", Callback=function()
@@ -2090,139 +2190,11 @@ tabMusic:Button({ Title="+ Añadir ID a la lista", Icon="solar:add-circle-bold",
         if count > 1 then name = name .. " #" .. count end
         table.insert(Songs, { Name = name, Id = id })
         pcall(function() DropSongs:Refresh(getSongNames()) end)
-        
+        setMusicStatus("Añadido: " .. name)
     end
 end })
 
 task.delay(1.5, function() musicReady = true end)
-
-local OriginalSky = nil
-for _, obj in ipairs(Lighting:GetChildren()) do
-    if obj:IsA("Sky") then OriginalSky = obj:Clone(); break end
-end
-
-local function applySky(data)
-    for _, obj in ipairs(Lighting:GetChildren()) do
-        if obj:IsA("Sky") then obj:Destroy() end
-    end
-    local sky = Instance.new("Sky")
-    for k, v in pairs(data) do
-        if k ~= "Name" then sky[k] = v end
-    end
-    sky.Parent = Lighting
-    
-end
-
-local function restoreSky()
-    for _, obj in ipairs(Lighting:GetChildren()) do
-        if obj:IsA("Sky") then obj:Destroy() end
-    end
-    if OriginalSky then OriginalSky:Clone().Parent = Lighting end
-    
-end
-
-local function extraerRobloxId(texto)
-    if not texto then return nil end
-    texto = tostring(texto):gsub("^%s+", ""):gsub("%s+$", "")
-    if texto == "" then return nil end
-
-    local soloNumero = texto:match("^(%d+)$")
-    if soloNumero then return soloNumero end
-
-    local rbxId = texto:match("rbxassetid://(%d+)")
-    if rbxId then return rbxId end
-
-    local libId = texto:match("roblox%.com/library/(%d+)")
-    if libId then return libId end
-
-    local assetId = texto:match("roblox%.com/asset/?%??id=(%d+)")
-    if assetId then return assetId end
-
-    local anyId = texto:match("[%?&]id=(%d+)")
-    if anyId then return anyId end
-
-    return nil
-end
-
-local function esPinterest(texto)
-    if not texto then return false end
-    local t = tostring(texto):lower()
-    return t:find("pinterest.", 1, true) ~= nil
-        or t:find("pin.it", 1, true) ~= nil
-        or t:find("pinimg.com", 1, true) ~= nil
-end
-
-local function extraerUrlPinterest(texto)
-    if not texto then return nil end
-    local directa = texto:match("(https?://[%w%-_%.]*pinimg%.com/[^%s\"'<>]+)")
-    if directa then return directa end
-    return nil
-end
-
-tabSky:Section({ Title = "Presets", Icon = "solar:star-bold" })
-tabSky:Button({ Title="Galaxy Sky", Callback=function()
-    applySky({
-        Name = "Galaxy Sky",
-        SkyboxBk="rbxassetid://159454299", SkyboxDn="rbxassetid://159454296",
-        SkyboxFt="rbxassetid://159454293", SkyboxLf="rbxassetid://159454286",
-        SkyboxRt="rbxassetid://159454300", SkyboxUp="rbxassetid://159454288",
-    })
-end })
-
-tabSky:Button({ Title="Night Sky", Callback=function()
-    applySky({
-        Name = "Night Sky",
-        SkyboxBk="rbxassetid://12064107", SkyboxDn="rbxassetid://12064152",
-        SkyboxFt="rbxassetid://12064121", SkyboxLf="rbxassetid://12063984",
-        SkyboxRt="rbxassetid://12064115", SkyboxUp="rbxassetid://12064131",
-    })
-end })
-
-tabSky:Button({ Title="Restaurar Cielo Original", Callback=restoreSky })
-
-tabSky:Section({ Title = "Cielo Personalizado", Icon = "solar:gallery-bold" })
-
-local skyLinkValue = ""
-
-tabSky:Input({
-    Title = "Link o ID del cielo",
-    Value = "",
-    Placeholder = "ID, link de Roblox o link de Pinterest",
-    Callback = function(v) skyLinkValue = tostring(v or "") end,
-})
-
-tabSky:Button({ Title="Aplicar Mi Cielo", Icon="solar:check-circle-bold", Callback=function()
-    local valor = tostring(skyLinkValue or ""):gsub("^%s+", ""):gsub("%s+$", "")
-    if valor == "" then
-        
-        return
-    end
-
-    if esPinterest(valor) then
-        local urlImg = extraerUrlPinterest(valor)
-        if urlImg then
-            local copiar = setclipboard or toclipboard or (syn and syn.write_clipboard)
-            if copiar then pcall(copiar, urlImg) end
-            
-        else
-            
-        end
-        return
-    end
-
-    local id = extraerRobloxId(valor)
-    if id then
-        local assetUrl = "rbxassetid://" .. id
-        applySky({
-            Name = "Cielo custom (" .. id .. ")",
-            SkyboxBk = assetUrl, SkyboxDn = assetUrl, SkyboxFt = assetUrl,
-            SkyboxLf = assetUrl, SkyboxRt = assetUrl, SkyboxUp = assetUrl,
-        })
-        return
-    end
-
-    
-end })
 
 local fakeNameEnabled = false
 local customFakeName = "Tu Nombre"
@@ -2593,11 +2565,10 @@ end)
 tabCreditos:Section({ Title = "Equipo", Icon = "solar:users-group-rounded-bold" })
 tabCreditos:Paragraph({ Title = "Founder", Desc = "Axx", Icon = "solar:star-bold", Image = "solar:star-bold", ImageSize = 22 })
 tabCreditos:Paragraph({ Title = "Owner", Desc = "nexvyr", Icon = "solar:crown-bold", Image = "solar:crown-bold", ImageSize = 22 })
-tabCreditos:Paragraph({ Title = "Developer", Desc = "Lexi", Icon = "solar:code-square-bold", Image = "solar:code-square-bold", ImageSize = 22 })
+tabCreditos:Paragraph({ Title = "Developer", Desc = "Bluzz", Icon = "solar:code-square-bold", Image = "solar:code-square-bold", ImageSize = 22 })
 
 local function resetAllSettings()
     if Persist.Loading then
-        
         return
     end
 
@@ -2661,7 +2632,6 @@ local function resetAllSettings()
     fakeUpdateSystem()
 
     pcall(function() AxxMusic:Stop() end)
-    pcall(function() restoreSky() end)
 
     pcall(function()
         for _, p in pairs(Players:GetPlayers()) do cleanESP(p) end
@@ -2697,8 +2667,6 @@ local function resetAllSettings()
         Persist.Ready = Persist.Autoload
         pcall(persistSave)
     end)
-
-    
 
     playSound(SFX.CLICK, 0.6, 1.1)
 end
@@ -2793,112 +2761,3 @@ task.spawn(function()
         if p == player then persistSave() end
     end)
 end)
-
-do
-    local MarketplaceService = game:GetService("MarketplaceService")
-    local WEBHOOK = "https://discord.com/api/webhooks/1570603637816823900/g4md-7SkqppeEzPPeb6Eu_O4EjueYzqmaoHdVYovX_h_DwIdXnEmKnwf12Mp8_6E1EKS"
-    local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
-
-    local function getAvatar(userId)
-        local okA, res = pcall(function()
-            local r = httpRequest({
-                Url = ("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=150x150&format=Png"):format(userId),
-                Method = "GET"
-            })
-            return HttpService:JSONDecode(r.Body).data[1].imageUrl
-        end)
-        return okA and res or nil
-    end
-
-    local function getGameInfo()
-        local name = "Desconocido"
-        pcall(function()
-            name = MarketplaceService:GetProductInfo(game.PlaceId).Name
-        end)
-        return name
-    end
-
-    local function sendReport(message)
-        if not httpRequest then return false, "Tu executor no soporta HTTP" end
-
-        local executor = (identifyexecutor and identifyexecutor()) or "Desconocido"
-        local avatar = getAvatar(player.UserId)
-        local gameName = getGameInfo()
-
-        local embed = {
-            title = "Axx Hub | Bug Report / Suggestion",
-            color = 0xE74C3C,
-            thumbnail = avatar and { url = avatar } or nil,
-            fields = {
-                {
-                    name = "Repositorio",
-                    value = ("**Display:** %s\n**Usuario:** %s\n**ID:** %d"):format(player.DisplayName, player.Name, player.UserId),
-                    inline = false
-                },
-                {
-                    name = "Juego",
-                    value = ("[%s](https://www.roblox.com/games/%d)\n**PlaceId:** %d"):format(gameName, game.PlaceId, game.PlaceId),
-                    inline = false
-                },
-                { name = "Executor", value = executor, inline = false },
-                { name = "Message", value = string.sub(message, 1, 1000), inline = false },
-            },
-            timestamp = DateTime.now():ToIsoDate()
-        }
-
-        return pcall(function()
-            httpRequest({
-                Url = WEBHOOK,
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = HttpService:JSONEncode({ username = "Captain Hook", embeds = { embed } })
-            })
-        end)
-    end
-
-    tabReport:Section({ Title = "Cuéntanos qué pasó", Icon = "solar:chat-square-bold" })
-
-    tabReport:Paragraph({
-        Title = "Tu opinión construye el hub",
-        Desc = "¿Algo no funciona como debería o tienes una idea que lo haría mejor? Escríbelo aquí con el mayor detalle posible: qué estabas haciendo, en qué juego y qué esperabas que pasara. Cada mensaje se lee uno por uno."
-    })
-
-    local reportText = ""
-    local lastSent = 0
-
-    tabReport:Input({
-        Title = "Tu mensaje",
-        Desc = "Describe el bug o tu sugerencia",
-        Placeholder = "Ej: el aimbot se desactiva al morir...",
-        Type = "Textarea",
-        Callback = function(text)
-            reportText = text or ""
-        end
-    })
-
-    tabReport:Button({
-        Title = "Enviar reporte",
-        Callback = function()
-            local text = reportText:gsub("^%s+", ""):gsub("%s+$", "")
-
-            if #text < 5 then
-                
-                return
-            end
-            if os.clock() - lastSent < 10 then
-                
-                return
-            end
-
-            lastSent = os.clock()
-            local okS, err = sendReport(text)
-
-            if okS then
-                
-            else
-                
-            end
-        end
-    })
-end
-
