@@ -973,16 +973,16 @@ end
 
 local winOk, Window = pcall(function()
     return WindUI:CreateWindow({
-        Title = "Axx Hub",
+        Title = "Yorusakura Hub",
         Theme = themeName,
-        Author = "By Axx",
+        Author = "By bluzz",
         Acrylic = false,
         Transparent = false,
         NewElements = true,
         Background = "rbxthumb://type=Asset&id=122217156545284&w=420&h=420",
         BackgroundImageTransparency = 0.35,
         OpenButton = {
-            Title = " Axx Hub",
+            Title = " Yorusakura Hub ",
             Icon = "rbxthumb://type=Asset&id=118232139384203&w=420&h=420",
             IconSize = 9, CornerRadius = UDim.new(1), StrokeThickness = 2,
             Enabled = true, Draggable = true, Scale = 0.9,
@@ -999,14 +999,14 @@ end
 
 -- Categorías (Sections)
 local MainSection   = Window:Section({ Title = "FUNCIONES PRINCIPALES", Opened = true })
-local CheatsSection = Window:Section({ Title = "TRAMPOSO", Opened = true })
+local CheatsSection = Window:Section({ Title = "Movimiento", Opened = true })
 local VisualSection = Window:Section({ Title = "VISUALES", Opened = true })
 local SystemSection = Window:Section({ Title = "SISTEMA", Opened = true })
 
 -- Tabs
 local tabAim      = MainSection:Tab({ Title = "Aimlock",  Icon = "solar:target-bold" })
 local tabTroll    = MainSection:Tab({ Title = "Trolling", Icon = "solar:fire-bold" })
-local tabCheats   = CheatsSection:Tab({ Title = "Tramposo", Icon = "solar:bolt-bold" })
+local tabCheats   = CheatsSection:Tab({ Title = "Movimiento", Icon = "solar:bolt-bold" })
 local tabESP      = VisualSection:Tab({ Title = "ESP",      Icon = "solar:eye-bold" })
 local tabFake     = VisualSection:Tab({ Title = "Identidad", Icon = "solar:user-id-bold" })
 local tabBotones  = VisualSection:Tab({ Title = "Botones",  Icon = "solar:gamepad-bold" })
@@ -1386,15 +1386,12 @@ persistToggle("ESP_TeamCheck", TogESPTeam, function() return AxxState.ESP.TeamCh
 persistSlider("ESP_MaxDist", SliESPDist, function() return AxxState.ESP.MaxDist end)
 persistColor("ESP_Color", ColESP, function() return AxxState.ESP.Color end, function(c) AxxState.ESP.Color = c end)
 
--- ============================================================
--- CHEATS con fix: restaura velocidad/salto original al desactivar
--- ============================================================
 local ch = AxxState.Cheats
 
 local SpeedOriginal = nil
 local JumpOriginal = nil
 
-tabCheats:Section({ Title = "Movimiento", Icon = "solar:walking-bold" })
+tabCheats:Section({ Title = "Velocidad & Salto", Icon = "solar:walking-bold" })
 
 local TogSpeed = tabCheats:Toggle({ Title="Speed", Value=false, Callback=function(v) ch.Speed = v end })
 local SliSpeed = tabCheats:Slider({ Title="Velocidad", Value={Min=16,Max=200,Default=50}, Callback=function(v) ch.SpeedValue = v end })
